@@ -38,7 +38,13 @@ class Phase(enum.Enum):
     ENTER_ROOM = 19
 
 
-class BaselineAgent(ArtificialBrain):
+class FoolMeOnceAgent(ArtificialBrain):
+    """
+
+    The base concept of this agent is to trust the human counterpart until they lie once, then
+    it will immediately switch to never trusting the human again.
+
+    """
     def __init__(self, slowdown, condition, name, folder):
         super().__init__(slowdown, condition, name, folder)
         # Initialization of some relevant variables
@@ -81,7 +87,7 @@ class BaselineAgent(ArtificialBrain):
                                     algorithm=Navigator.A_STAR_ALGORITHM)
 
     def filter_observations(self, state):
-        # Filtering of the world state before deciding on an action 
+        # Filtering of the world state before deciding on an action
         return state
 
     def decide_on_actions(self, state):
@@ -121,7 +127,7 @@ class BaselineAgent(ArtificialBrain):
         if self._agent_loc in [3, 4, 7, 10, 13, 14]:
             self._distance_drop = 'close'
 
-        # Check whether victims are currently being carried together by human and agent 
+        # Check whether victims are currently being carried together by human and agent
         for info in state.values():
             if 'is_human_agent' in info and self._human_name in info['name'] and len(
                     info['is_carrying']) > 0 and 'critical' in info['is_carrying'][0]['obj_id'] or \
@@ -346,7 +352,7 @@ class BaselineAgent(ArtificialBrain):
                     action = self._navigator.get_move_action(self._state_tracker)
                     # Check for obstacles blocking the path to the area and handle them if needed
                     if action is not None:
-                        # Remove obstacles blocking the path to the area 
+                        # Remove obstacles blocking the path to the area
                         for info in state.values():
                             if 'class_inheritance' in info and 'ObstacleObject' in info[
                                 'class_inheritance'] and 'stone' in info['obj_id'] and info['location'] not in [(9, 4),
@@ -402,7 +408,7 @@ class BaselineAgent(ArtificialBrain):
                                 self._send_message('Lets remove rock blocking ' + str(self._door['room_name']) + '!',
                                                   'RescueBot')
                                 return None, {}
-                        # Remain idle untill the human communicates what to do with the identified obstacle 
+                        # Remain idle untill the human communicates what to do with the identified obstacle
                         else:
                             return None, {}
 
@@ -455,7 +461,7 @@ class BaselineAgent(ArtificialBrain):
                                 \n clock - removal time together: 3 seconds \n afstand - distance between us: ' + self._distance_human + '\n clock - removal time alone: 20 seconds',
                                               'RescueBot')
                             self._waiting = True
-                        # Determine the next area to explore if the human tells the agent not to remove the obstacle          
+                        # Determine the next area to explore if the human tells the agent not to remove the obstacle
                         if self.received_messages_content and self.received_messages_content[
                             -1] == 'Continue' and not self._remove:
                             self._answered = True
@@ -905,13 +911,13 @@ class BaselineAgent(ArtificialBrain):
                 self._human_loc = int(mssgs[-1].split()[-1])
 
     def _loadBelief(self, members, folder):
-        """
+        '''
         Loads trust belief values if agent already collaborated with human before, otherwise trust belief values are initialized using default values.
-        """
+        '''
         # Create a dictionary with trust values for all team members
         trustBeliefs = {}
         # Set a default starting trust value
-        default = 0.5
+        default = 1
         trustfile_header = []
         trustfile_contents = []
         # Check if agent already collaborated with this human before, if yes: load the corresponding trust values, if no: initialize using default trust values
@@ -921,7 +927,7 @@ class BaselineAgent(ArtificialBrain):
                 if trustfile_header == []:
                     trustfile_header = row
                     continue
-                # Retrieve trust values 
+                # Retrieve trust values
                 if row and row[0] == self._human_name:
                     name = row[0]
                     competence = float(row[1])
@@ -938,14 +944,14 @@ class BaselineAgent(ArtificialBrain):
         '''
         Baseline implementation of a trust belief. Creates a dictionary with trust belief scores for each team member, for example based on the received messages.
         '''
-        # Update the trust value based on for example the received messages
+        # Update the trust value based on the received messages
         for message in receivedMessages:
-            # Increase agent trust in a team member that rescued a victim
-            if 'Collect' in message:
-                trustBeliefs[self._human_name]['competence'] += 0.10
-                # Restrict the competence belief to a range of -1 to 1
-                trustBeliefs[self._human_name]['competence'] = np.clip(trustBeliefs[self._human_name]['competence'], -1,
-                                                                       1)
+            # If the person lied when calling out a person's location, the robot doesn't trust
+            # that person anymore
+            if 'not present in' in message:
+                trustBeliefs[self._human_name]['competence'] = -1
+                trustBeliefs[self._human_name]['competence'] = -1
+
         # Save current trust belief values so we can later use and retrieve them to add to a csv file with all the logged trust belief values
         with open(folder + '/beliefs/currentTrustBelief.csv', mode='w') as csv_file:
             csv_writer = csv.writer(csv_file, delimiter=';', quotechar='"', quoting=csv.QUOTE_MINIMAL)
@@ -985,9 +991,9 @@ class BaselineAgent(ArtificialBrain):
         return min(dists, key=dists.get)
 
     def _efficientSearch(self, tiles):
-        '''
+        """
         efficiently transverse areas instead of moving over every single area tile
-        '''
+        """
         x = []
         y = []
         for i in tiles:
