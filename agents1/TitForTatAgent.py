@@ -38,11 +38,13 @@ class Phase(enum.Enum):
     ENTER_ROOM = 19
 
 
-class FoolMeOnceAgent(ArtificialBrain):
+class TitForTatAgent(ArtificialBrain):
     """
 
-    The base concept of this agent is to trust the human counterpart until they lie once, then
-    it will immediately switch to never trusting the human again.
+    The base concept of this agent is to start with a mid-point trust value, and then further adjust
+    the value taking into account the latest action of the human:
+    - if they lied, then they are not trusted anymore;
+    - if they were truthful, then they are back to fully trusted.
 
     """
     def __init__(self, slowdown, condition, name, folder):
@@ -685,7 +687,7 @@ class FoolMeOnceAgent(ArtificialBrain):
                     self._todo.append(self._recent_vic)
                     self._recent_vic = None
                     self._phase = Phase.FIND_NEXT_GOAL
-                # Remain idle untill the human communicates to the agent what to do with the found victim
+                # Remain idle until the human communicates to the agent what to do with the found victim
                 if self.received_messages_content and self._waiting and self.received_messages_content[
                     -1] != 'Rescue' and self.received_messages_content[-1] != 'Continue':
                     return None, {}
@@ -918,8 +920,8 @@ class FoolMeOnceAgent(ArtificialBrain):
         trustBeliefs = {}
         # Set a default starting trust value
         ## ------ CHANGE ---------
-        ## By default, the agent fully trusts the human.
-        default = 1
+        ## By default, the agent half-trusts the human.
+        default = 0
 
         trustfile_header = []
         trustfile_contents = []
@@ -948,14 +950,28 @@ class FoolMeOnceAgent(ArtificialBrain):
         Baseline implementation of a trust belief. Creates a dictionary with trust belief scores for each team member, for example based on the received messages.
         '''
         # Update the trust value based on the received messages
-        for message in receivedMessages:
+        lieIndex = -1
+        truthIndex = -1
+        for message,index in receivedMessages:
             # If the person lied when calling out a person's location, the robot doesn't trust
             # that person anymore
             if 'not present in' in message:
-                trustBeliefs[self._human_name]['competence'] = -1
-                trustBeliefs[self._human_name]['willingness'] = -1
-                msg = Message(content="Was lied to :(", from_id='RescueBot')
-                self.send_message(msg)
+                lieIndex = index
+
+            if 'because you told me' in message:
+                truthIndex = index
+
+        if truthIndex>lieIndex:
+            trustBeliefs[self._human_name]['competence'] = 1
+            trustBeliefs[self._human_name]['willingness'] = 1
+            msg = Message(content="Good :)", from_id='RescueBot')
+            self.send_message(msg)
+
+        if lieIndex > truthIndex:
+            trustBeliefs[self._human_name]['competence'] = -1
+            trustBeliefs[self._human_name]['competence'] = -1
+            msg = Message(content="Was lied to :(", from_id='RescueBot')
+            self.send_message(msg)
 
         # Save current trust belief values so we can later use and retrieve them to add to a csv file with all the logged trust belief values
         with open(folder + '/beliefs/currentTrustBelief.csv', mode='w') as csv_file:
