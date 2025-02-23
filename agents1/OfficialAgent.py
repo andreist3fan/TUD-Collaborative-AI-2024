@@ -1,3 +1,4 @@
+import re
 import sys, random, enum, ast, time, csv
 import numpy as np
 from matrx import grid_world
@@ -612,7 +613,7 @@ class BaselineAgent(ArtificialBrain):
                 if self._goal_vic in self._found_victims and self._goal_vic not in self._room_vics and \
                         self._found_victim_logs[self._goal_vic]['room'] == self._door['room_name']:
                     self._send_message(self._goal_vic + ' not present in ' + str(self._door[
-                                                                                    'room_name']) + ' because I searched the whole area without finding ' + self._goal_vic + '.',
+                                                                                    'room_name']) + ' because I searched the whole area without finding ' + self._goal_vic + '. If stuck, please decide whether to "Continue" searching.',
                                       'RescueBot')
                     # Remove the victim location from memory
                     self._found_victim_logs.pop(self._goal_vic, None)
@@ -832,15 +833,21 @@ class BaselineAgent(ArtificialBrain):
                     else:
                         foundVic = ' '.join(msg.split()[1:5])
                     loc = 'area ' + msg.split()[-1]
-                    # Add the area to the memory of searched areas
-                    if loc not in self._searched_rooms:
-                        self._searched_rooms.append(loc)
+
+                    # TODO If you trust the human enough, mark this room as searched, otherwise better search it yourself
+                    # if self._trust_beliefs['competence'] > 0.8:
+                    #     # Add the area to the memory of searched areas
+                    #     if loc not in self._searched_rooms:
+                    #         self._searched_rooms.append(loc)
+
                     # Add the victim and its location to memory
                     if foundVic not in self._found_victims:
                         self._found_victims.append(foundVic)
                         self._found_victim_logs[foundVic] = {'room': loc}
-                    if foundVic in self._found_victims and self._found_victim_logs[foundVic]['room'] != loc:
+                    elif self._found_victim_logs[foundVic]['room'] != loc and 'location' not in self._found_victim_logs[foundVic]:
+                        # Only change the room location if the agent has not already found the victim on its own
                         self._found_victim_logs[foundVic] = {'room': loc}
+
                     # Decide to help the human carry a found victim when the human's condition is 'weak'
                     if condition == 'weak':
                         self._rescue = 'together'
@@ -940,12 +947,29 @@ class BaselineAgent(ArtificialBrain):
         '''
         # Update the trust value based on for example the received messages
         for message in receivedMessages:
-            # Increase agent trust in a team member that rescued a victim
-            if 'Collect' in message:
-                trustBeliefs[self._human_name]['competence'] += 0.10
-                # Restrict the competence belief to a range of -1 to 1
-                trustBeliefs[self._human_name]['competence'] = np.clip(trustBeliefs[self._human_name]['competence'], -1,
-                                                                       1)
+            # Task: Search: Communicate findings ("I have found")
+            if 'Found' in message:
+                regex_extractor = re.search(r"Found: (.*?) in (\d+)", message)
+                victim = regex_extractor.group(1)
+                room_number = int(regex_extractor.group(2))
+
+                if victim in self._found_victims and 'area ' + str(room_number) == self._found_victim_logs[victim]['room']:
+                    # the human communicated a possible room location of the victim
+                    # TODO use some sort of confidence level (multiplying factor) such that when the human communicates correctly multiple times, the confidence increases
+                    # e.g. trust_factor and distrust_factor between 0 and 1
+                    trustBeliefs[self._human_name]['willingness'] += 0.10
+
+                    if 'location' in self._found_victim_logs[victim]:
+                        # the human was right and the agent found the human in that exact room
+                        trustBeliefs[self._human_name]['competence'] += 0.50
+                else:
+                    # the human lied (the agent could not find the victim in that room/ the agent found the victim in another room/ the human communicated multiple rooms for the same victim)
+                    trustBeliefs[self._human_name]['willingness'] -= 0.50
+
+            # Restrict the competence and wilingness beliefs to a range of -1 to 1
+            trustBeliefs[self._human_name]['competence'] = np.clip(trustBeliefs[self._human_name]['competence'], -1, 1)
+            trustBeliefs[self._human_name]['willingness'] = np.clip(trustBeliefs[self._human_name]['willingness'], -1, 1)
+
         # Save current trust belief values so we can later use and retrieve them to add to a csv file with all the logged trust belief values
         with open(folder + '/beliefs/currentTrustBelief.csv', mode='w') as csv_file:
             csv_writer = csv.writer(csv_file, delimiter=';', quotechar='"', quoting=csv.QUOTE_MINIMAL)
