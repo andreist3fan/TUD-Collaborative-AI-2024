@@ -1,4 +1,4 @@
-import sys, random, enum, ast, time, csv
+import sys, random, enum, ast, time, csv, re
 import numpy as np
 from matrx import grid_world
 from brains1.ArtificialBrain import ArtificialBrain
@@ -95,6 +95,8 @@ class BaselineAgent(ArtificialBrain):
             for member in self._team_members:
                 if mssg.from_id == member and mssg.content not in self._received_messages:
                     self._received_messages.append(mssg.content)
+
+
         # Process messages from team members
         self._process_messages(state, self._team_members, self._condition)
         # Initialize and update trust beliefs for team members
@@ -939,13 +941,37 @@ class BaselineAgent(ArtificialBrain):
         Baseline implementation of a trust belief. Creates a dictionary with trust belief scores for each team member, for example based on the received messages.
         '''
         # Update the trust value based on for example the received messages
+        area_rec_messages = {}
+        area_sent_messages = {}
+
+
         for message in receivedMessages:
-            # Increase agent trust in a team member that rescued a victim
-            if 'Collect' in message:
-                trustBeliefs[self._human_name]['competence'] += 0.10
-                # Restrict the competence belief to a range of -1 to 1
-                trustBeliefs[self._human_name]['competence'] = np.clip(trustBeliefs[self._human_name]['competence'], -1,
-                                                                       1)
+            if message.startswith('Search:'):
+                area = message.split()[-1]
+                if area in area_rec_messages:
+                    area_rec_messages[area].append(message)
+                else: area_rec_messages[area] = []
+            elif  message.startswith('Found:'):
+                regex_extractor = re.search(r"Found: (.*?) in (\d+)", message)
+                room_number = int(regex_extractor.group(2))
+                area_rec_messages[room_number].append(message)
+            elif message.startswith('Collect:'):
+                regex_extractor = re.search(r"Collect: (.*?) in (\d+)", message)
+                room_number = int(regex_extractor.group(2))
+                area_rec_messages[room_number].append(message)
+
+        for message in self._send_messages:
+            if message.startswith('Moving to:'):
+                area = message.split()[1]
+                if area not in area_sent_messages:
+                    area_sent_messages[area] = []
+                area_sent_messages[area].append(message)
+
+
+        # for area,r_messages in area_rec_messages.items():
+        #     if area in area_sent_messages:
+        #         if area_sent_messages[area]
+
         # Save current trust belief values so we can later use and retrieve them to add to a csv file with all the logged trust belief values
         with open(folder + '/beliefs/currentTrustBelief.csv', mode='w') as csv_file:
             csv_writer = csv.writer(csv_file, delimiter=';', quotechar='"', quoting=csv.QUOTE_MINIMAL)
