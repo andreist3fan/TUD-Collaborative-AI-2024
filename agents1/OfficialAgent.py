@@ -413,7 +413,7 @@ class BaselineAgent(ArtificialBrain):
                         objects.append(info)
                         # Communicate which obstacle is blocking the entrance
                         if self._answered == False and not self._remove and not self._waiting:
-                            self._send_message('Found tree blocking  ' + str(self._door['room_name']) + '. Please decide whether to "Remove" or "Continue" searching. \n \n \
+                            self._send_message('Found tree blocking ' + str(self._door['room_name']) + '. Please decide whether to "Remove" or "Continue" searching. \n \n \
                                 Important features to consider are: \n safe - victims rescued: ' + str(
                                 self._collected_victims) + '\n explore - areas searched: area ' + str(
                                 self._searched_rooms).replace('area ', '') + ' \
@@ -450,7 +450,7 @@ class BaselineAgent(ArtificialBrain):
                         objects.append(info)
                         # Communicate which obstacle is blocking the entrance
                         if self._answered == False and not self._remove and not self._waiting:
-                            self._send_message('Found stones blocking  ' + str(self._door['room_name']) + '. Please decide whether to "Remove together", "Remove alone", or "Continue" searching. \n \n \
+                            self._send_message('Found stones blocking ' + str(self._door['room_name']) + '. Please decide whether to "Remove together", "Remove alone", or "Continue" searching. \n \n \
                                 Important features to consider are: \n safe - victims rescued: ' + str(
                                 self._collected_victims) + ' \n explore - areas searched: area ' + str(
                                 self._searched_rooms).replace('area', '') + ' \
@@ -913,7 +913,7 @@ class BaselineAgent(ArtificialBrain):
         # Create a dictionary with trust values for all team members
         trustBeliefs = {}
         # Set a default starting trust value
-        default = -1
+        default = 0
         trustfile_header = []
         trustfile_contents = []
         # Check if agent already collaborated with this human before, if yes: load the corresponding trust values, if no: initialize using default trust values
@@ -944,33 +944,62 @@ class BaselineAgent(ArtificialBrain):
         area_rec_messages = {}
         area_sent_messages = {}
 
+        for room in range(1, 15):
+            area_rec_messages[room] = []
+            area_sent_messages[room] = []
 
         for message in receivedMessages:
             if message.startswith('Search:'):
                 area = message.split()[-1]
-                if area in area_rec_messages:
-                    area_rec_messages[area].append(message)
-                else: area_rec_messages[area] = []
-            elif  message.startswith('Found:'):
+                area_rec_messages[int(area)].append(message)
+            elif  message.startswith('Found:'): # found victim
                 regex_extractor = re.search(r"Found: (.*?) in (\d+)", message)
                 room_number = int(regex_extractor.group(2))
                 area_rec_messages[room_number].append(message)
-            elif message.startswith('Collect:'):
+            elif message.startswith('Collect:'): # rescue victim
                 regex_extractor = re.search(r"Collect: (.*?) in (\d+)", message)
+                room_number = int(regex_extractor.group(2))
+                area_rec_messages[room_number].append(message)
+            elif message.startswith('Remove:'): # remove obstacle
+                regex_extractor = re.search(r"Remove: (.*?) at (\d+)", message)
                 room_number = int(regex_extractor.group(2))
                 area_rec_messages[room_number].append(message)
 
         for message in self._send_messages:
-            if message.startswith('Moving to:'):
-                area = message.split()[1]
-                if area not in area_sent_messages:
-                    area_sent_messages[area] = []
-                area_sent_messages[area].append(message)
+            #print(message)
+            if message.startswith('Moving to'): # moving to area
+                regex_extractor = re.search(r"Moving to area (\d+)", message)
+                room_number = int(regex_extractor.group(1))
+                area_sent_messages[room_number].append(message)
+            elif message.startswith('Found ') and 'blocking' in message: # obstacle in area
+                regex_extractor = re.search(r"Found (.*?) blocking area (\d+)", message)
+                room_number = int(regex_extractor.group(2))
+                area_sent_messages[room_number].append(message)
+            elif message.startswith('Found '):
+                regex_extractor = re.search(r"Found (.*?) in area (\d+)", message) # victim in area
+                room_number = int(regex_extractor.group(2))
+                area_sent_messages[room_number].append(message)
+
+        for room in area_rec_messages:
+            human_reported_obstacle = any('Remove' in msg for msg in area_rec_messages[room])
+            robot_found_obstacle = any('Found' in msg and 'blocking' in msg for msg in area_sent_messages[room])
+
+            if robot_found_obstacle and not human_reported_obstacle:
+                trustBeliefs[self._human_name]['competence'] -= 0.1  # Human failed to report an obstacle
+                continue # skip the rest of the loop, since we'll be removing the obstacle anyway
+            elif human_reported_obstacle:
+                trustBeliefs[self._human_name]['competence'] += 0.2  # Human correctly reported an obstacle
+
+            human_reported_victim = any('Found' in msg for msg in area_rec_messages[room])
+            robot_found_victim = any('Found' in msg and 'in' in msg for msg in area_sent_messages[room])
+            human_rescued_victim = any('Collect' in msg for msg in area_rec_messages[room])
+
+            if robot_found_victim and not (human_reported_victim or human_rescued_victim):
+                trustBeliefs[self._human_name]['competence'] -= 0.1  # Human failed to report or rescue a victim
+            elif human_reported_victim or human_rescued_victim:
+                trustBeliefs[self._human_name]['competence'] += 0.2  # Human correctly reported or rescued a victim
 
 
-        # for area,r_messages in area_rec_messages.items():
-        #     if area in area_sent_messages:
-        #         if area_sent_messages[area]
 
         # Save current trust belief values so we can later use and retrieve them to add to a csv file with all the logged trust belief values
         with open(folder + '/beliefs/currentTrustBelief.csv', mode='w') as csv_file:
