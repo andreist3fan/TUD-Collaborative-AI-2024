@@ -931,14 +931,16 @@ class BaselineAgent(ArtificialBrain):
                 # Retrieve trust values 
                 if row and row[0] == self._human_name:
                     name = row[0]
-                    competence = float(row[1])
-                    willingness = float(row[2])
-                    trustBeliefs[name] = {'competence': competence, 'willingness': willingness}
+                    task = row[1]
+                    competence = float(row[2])
+                    willingness = float(row[3])
+                    trustBeliefs[name][task] = {'competence': competence, 'willingness': willingness}
                 # Initialize default trust values
                 if row and row[0] != self._human_name:
                     competence = default
                     willingness = default
-                    trustBeliefs[self._human_name] = {'competence': competence, 'willingness': willingness}
+                    trustBeliefs[self._human_name] = {}
+                    trustBeliefs[self._human_name]['search'] = {'competence': competence, 'willingness': willingness}
         return trustBeliefs
 
     def _trustBelief(self, members, trustBeliefs, folder, receivedMessages):
@@ -957,25 +959,25 @@ class BaselineAgent(ArtificialBrain):
                     # the human communicated a possible room location of the victim
                     # TODO use some sort of confidence level (multiplying factor) such that when the human communicates correctly multiple times, the confidence increases
                     # e.g. trust_factor and distrust_factor between 0 and 1
-                    trustBeliefs[self._human_name]['willingness'] += 0.10
+                    trustBeliefs[self._human_name]['search']['willingness'] += 0.10
 
                     if 'location' in self._found_victim_logs[victim]:
                         # the human was right and the agent found the human in that exact room
-                        trustBeliefs[self._human_name]['competence'] += 0.50
+                        trustBeliefs[self._human_name]['search']['competence'] += 0.50
                 else:
                     # the human lied (the agent could not find the victim in that room/ the agent found the victim in another room/ the human communicated multiple rooms for the same victim)
-                    trustBeliefs[self._human_name]['willingness'] -= 0.50
+                    trustBeliefs[self._human_name]['search']['willingness'] -= 0.50
 
             # Restrict the competence and wilingness beliefs to a range of -1 to 1
-            trustBeliefs[self._human_name]['competence'] = np.clip(trustBeliefs[self._human_name]['competence'], -1, 1)
-            trustBeliefs[self._human_name]['willingness'] = np.clip(trustBeliefs[self._human_name]['willingness'], -1, 1)
+            trustBeliefs[self._human_name]['search']['competence'] = np.clip(trustBeliefs[self._human_name]['search']['competence'], -1, 1)
+            trustBeliefs[self._human_name]['search']['willingness'] = np.clip(trustBeliefs[self._human_name]['search']['willingness'], -1, 1)
 
         # Save current trust belief values so we can later use and retrieve them to add to a csv file with all the logged trust belief values
         with open(folder + '/beliefs/currentTrustBelief.csv', mode='w') as csv_file:
             csv_writer = csv.writer(csv_file, delimiter=';', quotechar='"', quoting=csv.QUOTE_MINIMAL)
-            csv_writer.writerow(['name', 'competence', 'willingness'])
-            csv_writer.writerow([self._human_name, trustBeliefs[self._human_name]['competence'],
-                                 trustBeliefs[self._human_name]['willingness']])
+            csv_writer.writerow(['name', 'task', 'competence', 'willingness'])
+            csv_writer.writerow([self._human_name, 'search', trustBeliefs[self._human_name]['search']['competence'],
+                                 trustBeliefs[self._human_name]['search']['willingness']])
 
         return trustBeliefs
 
