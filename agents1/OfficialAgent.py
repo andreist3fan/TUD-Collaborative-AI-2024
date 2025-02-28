@@ -100,7 +100,7 @@ class BaselineAgent(ArtificialBrain):
         # Process messages from team members
         self._process_messages(state, self._team_members, self._condition)
         # Initialize and update trust beliefs for team members
-        trustBeliefs = self._loadBelief(self._team_members, self._folder)
+        trustBeliefs = self._loadBelief(self._team_members, self._folder + '/beliefs/allTrustBeliefs.csv')
         self._trustBelief(self._team_members, trustBeliefs, self._folder, self._received_messages)
 
         # Check whether human is close in distance
@@ -235,7 +235,7 @@ class BaselineAgent(ArtificialBrain):
                 # If all areas have been searched but the task is not finished, start searching areas again
                 if self._remainingZones and len(unsearched_rooms) == 0:
                     self._to_search = []
-                    self._searched_rooms = []
+                    self._searched_rooms = set()
                     self._send_messages = []
                     self.received_messages = []
                     self.received_messages_content = []
@@ -829,8 +829,8 @@ class BaselineAgent(ArtificialBrain):
         '''
         process incoming messages received from the team members
         '''
-        #trustBeliefs = self._loadBelief(self._team_members, self._folder)
-        # TODO: load from currentbelief.csv
+        # Load the most recent trust beliefs in the current game round
+        trustBeliefs = self._loadBelief(self._team_members, self._folder + '/beliefs/currentTrustBelief.csv')
 
         receivedMessages = {}
         # Create a dictionary with a list of received messages from each team member
@@ -846,10 +846,9 @@ class BaselineAgent(ArtificialBrain):
                 # If a received message involves team members searching areas, add these areas to the memory of areas that have been explored
                 if msg.startswith("Search:"):
                     area = 'area ' + msg.split()[-1]
-                    # TODO: If you trust the human enough, do not re-search the area
-                    #if trustBeliefs['competence'] > 0.6 and area not in self._searched_rooms:
-                    self._searched_rooms.add(area)
-
+                    # If you trust the human enough, mark this room as searched, otherwise better search it yourself
+                    if trustBeliefs[self._human_name]['search']['competence'] > 0.6 and area not in self._searched_rooms:
+                        self._searched_rooms.add(area)
                 # If a received message involves team members finding victims, add these victims and their locations to memory
                 if msg.startswith("Found:"):
                     # Identify which victim and area it concerns
@@ -859,11 +858,9 @@ class BaselineAgent(ArtificialBrain):
                         foundVic = ' '.join(msg.split()[1:5])
                     loc = 'area ' + msg.split()[-1]
 
-                    # TODO: If you trust the human enough, mark this room as searched, otherwise better search it yourself
-                    #if self._trust_beliefs['competence'] > 0.6:
-                    # Add the area to the memory of searched areas
-                    # if loc not in self._searched_rooms:
-                    #    self._searched_rooms.add(loc)
+                    # If you trust the human enough, mark this room as searched, otherwise better search it yourself
+                    if trustBeliefs[self._human_name]['search']['competence'] > 0.6 and loc not in self._searched_rooms:
+                        self._searched_rooms.add(loc)
 
                     # Add the victim and its location to memory
                     if foundVic not in self._found_victims:
@@ -936,7 +933,7 @@ class BaselineAgent(ArtificialBrain):
                                                    '14']:
                 self._human_loc = int(mssgs[-1].split()[-1])
 
-    def _loadBelief(self, members, folder):
+    def _loadBelief(self, members, filepath):
         """
         Loads trust belief values if agent already collaborated with human before, otherwise trust belief values are initialized using default values.
         """
@@ -947,7 +944,7 @@ class BaselineAgent(ArtificialBrain):
         trustfile_header = []
         trustfile_contents = []
         # Check if agent already collaborated with this human before, if yes: load the corresponding trust values, if no: initialize using default trust values
-        with open(folder + '/beliefs/allTrustBeliefs.csv') as csvfile:
+        with open(filepath) as csvfile:
             reader = csv.reader(csvfile, delimiter=';', quotechar="'")
             for row in reader:
                 if trustfile_header == []:
@@ -959,6 +956,7 @@ class BaselineAgent(ArtificialBrain):
                     task = row[1]
                     competence = float(row[2])
                     willingness = float(row[3])
+                    trustBeliefs[name] = {}
                     trustBeliefs[name][task] = {'competence': competence, 'willingness': willingness}
                 # Initialize default trust values
                 if row and row[0] != self._human_name:
