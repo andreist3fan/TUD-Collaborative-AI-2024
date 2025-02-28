@@ -962,8 +962,24 @@ class BaselineAgent(ArtificialBrain):
                 area_rec_messages[int(area)].append(message)
             elif  message.startswith('Found:'): # found victim
                 regex_extractor = re.search(r"Found: (.*?) in (\d+)", message)
+                victim = regex_extractor.group(1)
                 room_number = int(regex_extractor.group(2))
                 area_rec_messages[room_number].append(message)
+                # Task: Search: Communicate findings ("I have found")
+                if victim in self._found_victims and 'area ' + str(room_number) == self._found_victim_logs[victim][
+                    'room']:
+                    # the human communicated a possible room location of the victim
+                    # TODO use some sort of confidence level (multiplying factor) such that when the human communicates correctly multiple times, the confidence increases
+                    # e.g. trust_factor and distrust_factor between 0 and 1
+                    trustBeliefs[self._human_name]['search']['willingness'] += 0.10
+
+                    if 'location' in self._found_victim_logs[victim]:
+                        # the human was right and the agent found the human in that exact room
+                        trustBeliefs[self._human_name]['search']['competence'] += 0.50
+                else:
+                    # the human lied (the agent could not find the victim in that room/ the agent found the victim in another room/ the human communicated multiple rooms for the same victim)
+                    trustBeliefs[self._human_name]['search']['willingness'] -= 0.50
+
             elif message.startswith('Collect:'): # rescue victim
                 regex_extractor = re.search(r"Collect: (.*?) in (\d+)", message)
                 room_number = int(regex_extractor.group(2))
@@ -1009,28 +1025,10 @@ class BaselineAgent(ArtificialBrain):
 
 
 
-            # Task: Search: Communicate findings ("I have found")
-            if 'Found' in message:
-                regex_extractor = re.search(r"Found: (.*?) in (\d+)", message)
-                victim = regex_extractor.group(1)
-                room_number = int(regex_extractor.group(2))
 
-                if victim in self._found_victims and 'area ' + str(room_number) == self._found_victim_logs[victim]['room']:
-                    # the human communicated a possible room location of the victim
-                    # TODO use some sort of confidence level (multiplying factor) such that when the human communicates correctly multiple times, the confidence increases
-                    # e.g. trust_factor and distrust_factor between 0 and 1
-                    trustBeliefs[self._human_name]['search']['willingness'] += 0.10
-
-                    if 'location' in self._found_victim_logs[victim]:
-                        # the human was right and the agent found the human in that exact room
-                        trustBeliefs[self._human_name]['search']['competence'] += 0.50
-                else:
-                    # the human lied (the agent could not find the victim in that room/ the agent found the victim in another room/ the human communicated multiple rooms for the same victim)
-                    trustBeliefs[self._human_name]['search']['willingness'] -= 0.50
-
-            # Restrict the competence and wilingness beliefs to a range of -1 to 1
-            trustBeliefs[self._human_name]['search']['competence'] = np.clip(trustBeliefs[self._human_name]['search']['competence'], -1, 1)
-            trustBeliefs[self._human_name]['search']['willingness'] = np.clip(trustBeliefs[self._human_name]['search']['willingness'], -1, 1)
+        # Restrict the competence and wilingness beliefs to a range of -1 to 1
+        trustBeliefs[self._human_name]['search']['competence'] = np.clip(trustBeliefs[self._human_name]['search']['competence'], -1, 1)
+        trustBeliefs[self._human_name]['search']['willingness'] = np.clip(trustBeliefs[self._human_name]['search']['willingness'], -1, 1)
 
         # Save current trust belief values so we can later use and retrieve them to add to a csv file with all the logged trust belief values
         with open(folder + '/beliefs/currentTrustBelief.csv', mode='w') as csv_file:
