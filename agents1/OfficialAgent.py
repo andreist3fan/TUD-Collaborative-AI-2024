@@ -73,6 +73,7 @@ class BaselineAgent(ArtificialBrain):
         self._recent_vic = None
         self._received_messages = []
         self._moving = False
+        self._default_trust_value = 0
 
     def initialize(self):
         # Initialization of the state tracker and navigation algorithm
@@ -940,7 +941,6 @@ class BaselineAgent(ArtificialBrain):
         # Create a dictionary with trust values for all team members
         trustBeliefs = {}
         # Set a default starting trust value
-        default = 0
         trustfile_header = []
         trustfile_contents = []
         # Check if agent already collaborated with this human before, if yes: load the corresponding trust values, if no: initialize using default trust values
@@ -960,8 +960,8 @@ class BaselineAgent(ArtificialBrain):
                     trustBeliefs[name][task] = {'competence': competence, 'willingness': willingness}
                 # Initialize default trust values
                 if row and row[0] != self._human_name:
-                    competence = default
-                    willingness = default
+                    competence = self._default_trust_value
+                    willingness = self._default_trust_value
                     trustBeliefs[self._human_name] = {}
                     trustBeliefs[self._human_name]['search'] = {'competence': competence, 'willingness': willingness}
         return trustBeliefs
@@ -987,6 +987,11 @@ class BaselineAgent(ArtificialBrain):
 
     def trustBeliefSearch(self, receivedMessages, trustBeliefs):
         # Update the trust value based on for example the received messages
+        # Since `receivedMessages` is a list of all messages,
+        # some messages will be counted many times, so we reset the trust values to defaults here.
+        trustBeliefs[self._human_name]['search']['competence'] = self._default_trust_value
+        trustBeliefs[self._human_name]['search']['willingness'] = self._default_trust_value
+
         area_rec_messages = {}
         area_sent_messages = {}
         for room in range(1, 15):
