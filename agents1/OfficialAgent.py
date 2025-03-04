@@ -77,7 +77,7 @@ class BaselineAgent(ArtificialBrain):
         self._default_trust_value = 0
 
         self._lookup_table = {
-            "Mild":{
+            "Mild": {
                 "Rescue together": {
                     ("close", "close"): {"competence": 0.05, "willingness": 0.1},
                     ("close", "far"): {"competence": 0.15, "willingness": 0.1},
@@ -98,7 +98,7 @@ class BaselineAgent(ArtificialBrain):
                     ("far", "far"): {"competence": 0.05, "willingness": -0.15},
                 },
             },
-            "Critical":{
+            "Critical": {
                 "Rescue": {  # For "critical" cases
                     ("close", "close"): {"competence": 0.15, "willingness": 0.1},
                     ("close", "far"): {"competence": 0.2, "willingness": 0.1},
@@ -1015,14 +1015,12 @@ class BaselineAgent(ArtificialBrain):
         if len(receivedMessages) == 0:
             return
         tick_nr = self._state['World']['nr_ticks']
-        if not self._state[{'is_human_agent': True}]:
-            # Define distance to drop zone based on last known area location
-            if self._agent_loc in [1, 2, 5, 6, 8, 9, 11, 12]:
-                self._distance_drop = 'far'
-            if self._agent_loc in [3, 4, 7, 10, 13, 14]:
-                self._distance_drop = 'close'
-
-            self._tick_distance_goal[tick_nr] = self._distance_drop
+        _distance_drop = 'far'
+        if self._agent_loc in [1, 2, 5, 6, 8, 9, 11, 12]:
+            _distance_drop = 'far'
+        if self._agent_loc in [3, 4, 7, 10, 13, 14]:
+            _distance_drop = 'close'
+        self._tick_distance_goal[tick_nr] = _distance_drop
 
         diffLen = len(receivedMessages) - len(self._current_tick_received_messages)
         new_messages = receivedMessages[-diffLen:] if diffLen > 0 else []
@@ -1059,30 +1057,34 @@ class BaselineAgent(ArtificialBrain):
                 else:
                     cur_message = self._current_tick_received_messages[received_index][0]
                     received_index += 1
-            self.update_collected_victims(cur_message, claimed_saved)
+            self.update_collected_victims(cur_message, claimed_saved, trustBeliefs)
             self.check_if_collected_victim_found(cur_message, claimed_saved, trustBeliefs)
 
-
-        for send_message, send_tick in [t for t in self._send_message_ticks if 'Found' in t[0] and 'injured' in t[0] and 'removal' not in t[0]]:
+        for send_message, send_tick in [t for t in self._send_message_ticks if
+                                        'Found' and 'injured' in t[0] and 'removal' not in t[0]]:
 
             next_received_messages = self.find_next_received(send_tick)
             for response, resp_tick in next_received_messages:
-                if 'mild' in send_message:
+                if 'Found mild' in send_message:
                     if not given_relevant_response_in_time_yellow:
                         # Extract "distance between us"
-                        given_relevant_response_in_time_yellow = True
                         distance_match = re.search(r'afstand - distance between us: (\w+)', send_message)
                         distance_human = distance_match.group(1) if distance_match else None
 
-                        if self._lookup_table['Mild'][response]:
-                            trustBeliefs[self._human_name]['rescue_yellow']['competence'] += self._lookup_table["Mild"][response][(distance_human, self._tick_distance_goal[send_tick])]['competence']
-                            trustBeliefs[self._human_name]['rescue_yellow']['willingness'] += self._lookup_table["Mild"][response][(distance_human, self._tick_distance_goal[send_tick])]['willingness']
+                        if response in self._lookup_table['Mild'].keys():
+                            given_relevant_response_in_time_yellow = True
+                            trustBeliefs[self._human_name]['rescue_yellow']['competence'] += \
+                            self._lookup_table["Mild"][response][(distance_human, self._tick_distance_goal[send_tick])][
+                                'competence']
+                            trustBeliefs[self._human_name]['rescue_yellow']['willingness'] += \
+                            self._lookup_table["Mild"][response][(distance_human, self._tick_distance_goal[send_tick])][
+                                'willingness']
                         else:
                             if resp_tick - send_tick > relevant_response_time_threshold_yellow:
                                 trustBeliefs[self._human_name]['rescue_yellow']['willingness'] -= 0.1
                                 trustBeliefs[self._human_name]['rescue_yellow']['competence'] -= 0.1
 
-                elif 'critical' in send_message:
+                elif 'Found critical' in send_message:
                     if not given_relevant_response_in_time_red:
                         given_relevant_response_in_time_red = True
                         victims_match = re.search(r'safe - victims rescued: \[(.*?)\]', send_message)
@@ -1097,32 +1099,31 @@ class BaselineAgent(ArtificialBrain):
                             trustBeliefs[self._human_name]['rescue_red']['competence'] -= 0.1
                             trustBeliefs[self._human_name]['rescue_red']['willingness'] -= 0.1
 
-                        if self._lookup_table['Critical'][response]:
+                        if response in self._lookup_table['Critical'].keys():
                             trustBeliefs[self._human_name]['rescue_red']['competence'] += \
                                 self._lookup_table["Critical"][response][
-                                (distance_human, self._tick_distance_goal[send_tick])]['competence']
+                                    (distance_human, self._tick_distance_goal[send_tick])]['competence']
                             trustBeliefs[self._human_name]['rescue_red']['willingness'] += \
                                 self._lookup_table["Critical"][response][
-                                (distance_human, self._tick_distance_goal[send_tick])]['willingness']
+                                    (distance_human, self._tick_distance_goal[send_tick])]['willingness']
                         else:
                             if resp_tick - send_tick > relevant_response_time_threshold_red:
                                 trustBeliefs[self._human_name]['rescue_red']['competence'] -= 0.1
                                 trustBeliefs[self._human_name]['rescue_red']['willingness'] -= 0.1
 
-        for rec_message, rec_tick in self._current_tick_received_messages:
-            self.check_if_collected_victim_found(rec_message, claimed_saved, trustBeliefs)
-
-
+        for rec_message, rec_tick in [t for t in self._send_message_ticks if 'Found:' in t[0]]:
             next_received_messages = self.find_next_received(rec_tick)
-            next_message = None
-            if len(next_received_messages)>0:
-                next_message = next_received_messages[0]
             if 'mild' in rec_message:
-                print('hui')
-            elif 'critical' in rec_message:
-                print(next_received_messages)
-
-
+                next_message_length = 2 if (len(next_received_messages) >= 2) else len(next_received_messages)
+                collected_victim = False
+                for i in range(0, next_message_length):
+                    if 'Collect' in next_received_messages[i]:
+                        collected_victim = True
+                        trustBeliefs[self._human_name]['rescue_red']['competence'] += 0.1
+                        trustBeliefs[self._human_name]['rescue_red']['willingness'] += 0.1
+                if not collected_victim:
+                    trustBeliefs[self._human_name]['rescue_red']['competence'] -= 0.1
+                    trustBeliefs[self._human_name]['rescue_red']['willingness'] -= 0.1
 
         # self.trustBeliefSearch(receivedMessages, trustBeliefs)
 
@@ -1158,20 +1159,21 @@ class BaselineAgent(ArtificialBrain):
         match = re.search(r'Found\s+(\w+)\s+(\w+)\s+(\w+)', send_message)
         victim = None
         if match:
-            victim = " ".join(match.groups())  # Join the words into a single stri
-            print("Next 3 words after 'Found':", victim)
+            victim = " ".join(match.groups()).replace(':', '')  # Join the words into a single string
         if victim in claimed_saved:
             trustBeliefs[self._human_name]['rescue_yellow']['competence'] -= 0.3
             trustBeliefs[self._human_name]['rescue_yellow']['willingness'] -= 0.3
 
-    def update_collected_victims(self, send_message, claimed_saved):
+    def update_collected_victims(self, send_message, claimed_saved, trustBeliefs):
         match = re.search(r'Collect:\s+(\w+)\s+(\w+)\s+(\w+)', send_message)
         victim = None
         if match:
-            victim = " ".join(match.groups())  # Join the words into a single stri
-            print("Next 3 words after 'Found':", victim)
+            victim = " ".join(match.groups())  # Join the words into a single string
         if victim not in claimed_saved:
             claimed_saved.append(victim)
+        else:
+            trustBeliefs[self._human_name]['rescue_yellow']['competence'] -= 0.3
+            trustBeliefs[self._human_name]['rescue_yellow']['willingness'] -= 0.3
 
     def trustBeliefSearch(self, receivedMessages, trustBeliefs):
         # Update the trust value based on for example the received messages
