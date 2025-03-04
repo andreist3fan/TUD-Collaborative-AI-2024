@@ -19,6 +19,7 @@ from agents1.TutorialAgent import TutorialAgent
 from actions1.CustomActions import RemoveObjectTogether
 from brains1.HumanBrain import HumanBrain
 from loggers.ActionLogger import ActionLogger
+from loggers.TrustEvaluationLogger import TrustEvaluationLogger
 from datetime import datetime
 
 random_seed = 1
@@ -172,6 +173,9 @@ def create_builder(task_type, condition, name, folder):
         current_exp_folder = datetime.now().strftime("exp_"+condition+"_at_time_%Hh-%Mm-%Ss_date_%dd-%mm-%Yy")
         logger_save_folder = os.path.join("logs", current_exp_folder)
         builder.add_logger(ActionLogger, log_strategy=1, save_path=logger_save_folder, file_name_prefix="actions_")
+
+        # Evaluation Logger
+        builder.add_logger(TrustEvaluationLogger, log_strategy=1000, save_path=logger_save_folder, file_name_prefix="evaluation_")
         
     # Add all area and objects to the official world
     if task_type == "official":
