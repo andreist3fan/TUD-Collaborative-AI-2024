@@ -968,7 +968,7 @@ class BaselineAgent(ArtificialBrain):
                     trustBeliefs[name][task] = {'competence': competence, 'willingness': willingness}
 
             # Initialize default trust values
-            if name not in trustBeliefs:
+            if self._human_name not in trustBeliefs:
                 trustBeliefs[self._human_name] = {}
 
                 competence = self._default_trust_value

@@ -27,12 +27,16 @@ class TrustEvaluationLogger(GridWorldLogger):
                 if row:
                     name = row[0]
                     task = row[1]
-                    competence = float(row[2])
-                    willingness = float(row[3])
+                    competence = float(row[2]) if row[2] else 0
+                    willingness = float(row[3]) if row[3] else 0
+
                     if name not in trustBeliefs:
                         trustBeliefs[name] = {}
+                        trustBeliefs[name]['search'] = {'competence': 0, 'willingness': 0}
+                        trustBeliefs[name]['rescue'] = {'competence': 0, 'willingness': 0}
 
-                    trustBeliefs[name][task] = {'competence': competence, 'willingness': willingness}
+                    if task:
+                        trustBeliefs[name][task] = {'competence': competence, 'willingness': willingness}
 
         # We will log trust beliefs per task
         log_data['name'] = name
