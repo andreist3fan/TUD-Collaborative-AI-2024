@@ -1078,6 +1078,12 @@ class BaselineAgent(ArtificialBrain):
                 elif human_reported_victim or human_rescued_victim:
                     trustBeliefs[self._human_name]['search'][
                         'competence'] += 0.1  # Human correctly reported or rescued a victim
+
+                # If nothing was announced and nothing was found, increase competence
+                if (not robot_found_victim and not robot_found_obstacle
+                        and not human_reported_victim and not human_reported_obstacle
+                        and not human_rescued_victim):
+                    trustBeliefs[self._human_name]['search']['competence'] += 0.1
         #print(
         #    f"Updated belief: {trustBeliefs[self._human_name]['search']['competence']}, {trustBeliefs[self._human_name]['search']['willingness']}")
 
