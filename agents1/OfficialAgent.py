@@ -383,13 +383,19 @@ class BaselineAgent(ArtificialBrain):
                                               'RescueBot')
                             self._waiting = True
                             ## !!!!! ADDED BY US !!!!!
-                            if trustBeliefs[self._human_name]['search']['competence'] < -0.2:
-                                self._send_message('I found a rock blocking ' + str(self._door['room_name']) + '. However, I will ignore it for now and continue searching.','RescueBot')
-                                self._answered = True
-                                self._waiting = False
-                                self._to_search.append(self._door['room_name'])
-                                self._phase = Phase.FIND_NEXT_GOAL
-                            # Determine the next area to explore if the human tells the agent not to remove the obstacle
+
+                            # if there is anything to do besides removing the obstacle, enter this if statement
+                            # otherwise, behave as before (trust the human unconditionally)
+                            if len(self._collected_victims) <6: # if >=6, then likely only the two
+                                # rocks are left, so we have to trust the human,
+                                # or they cooperated well enough
+                                if trustBeliefs[self._human_name]['search']['competence'] < -0.2:
+                                    self._send_message('I found a rock blocking ' + str(self._door['room_name']) + '. However, I will ignore it for now and continue searching.','RescueBot')
+                                    self._answered = True
+                                    self._waiting = False
+                                    self._to_search.append(self._door['room_name'])
+                                    self._phase = Phase.FIND_NEXT_GOAL
+                                # Determine the next area to explore if the human tells the agent not to remove the obstacle
                         if self.received_messages_content and self.received_messages_content[
                             -1] == 'Continue' and not self._remove:
                             self._answered = True
@@ -956,14 +962,19 @@ class BaselineAgent(ArtificialBrain):
                     task = row[1]
                     competence = float(row[2])
                     willingness = float(row[3])
-                    trustBeliefs[name] = {}
+                    if name not in trustBeliefs:
+                        trustBeliefs[name] = {}
+
                     trustBeliefs[name][task] = {'competence': competence, 'willingness': willingness}
-                # Initialize default trust values
-                if row and row[0] != self._human_name:
-                    competence = self._default_trust_value
-                    willingness = self._default_trust_value
-                    trustBeliefs[self._human_name] = {}
-                    trustBeliefs[self._human_name]['search'] = {'competence': competence, 'willingness': willingness}
+
+            # Initialize default trust values
+            if self._human_name not in trustBeliefs:
+                trustBeliefs[self._human_name] = {}
+
+                competence = self._default_trust_value
+                willingness = self._default_trust_value
+                trustBeliefs[self._human_name]['search'] = {'competence': competence, 'willingness': willingness}
+
         return trustBeliefs
 
     def _trustBelief(self, members, trustBeliefs, folder, receivedMessages):
@@ -989,8 +1000,10 @@ class BaselineAgent(ArtificialBrain):
         # Update the trust value based on for example the received messages
         # Since `receivedMessages` is a list of all messages,
         # some messages will be counted many times, so we reset the trust values to defaults here.
-        trustBeliefs[self._human_name]['search']['competence'] = self._default_trust_value
-        trustBeliefs[self._human_name]['search']['willingness'] = self._default_trust_value
+
+        # trustBeliefs[self._human_name]['search']['competence'] = self._default_trust_value
+        # trustBeliefs[self._human_name]['search']['willingness'] = self._default_trust_value
+        #print(f"Current belief: {trustBeliefs[self._human_name]['search']['competence']}, {trustBeliefs[self._human_name]['search']['willingness']}")
 
         area_rec_messages = {}
         area_sent_messages = {}
@@ -1026,8 +1039,8 @@ class BaselineAgent(ArtificialBrain):
                 room_number = int(regex_extractor.group(2))
                 area_rec_messages[room_number].append(message)
             elif message.startswith('Remove:'):  # remove obstacle
-                regex_extractor = re.search(r"Remove: (.*?) at (\d+)", message)
-                room_number = int(regex_extractor.group(2))
+                regex_extractor = re.search(r"Remove: at (\d+)", message)
+                room_number = int(regex_extractor.group(1))
                 area_rec_messages[room_number].append(message)
         for message in self._send_messages:
             # print(message)
@@ -1053,21 +1066,31 @@ class BaselineAgent(ArtificialBrain):
 
                 # If the robot finds an obstacle not called out by the human
                 if robot_found_obstacle and not human_reported_obstacle:
-                    trustBeliefs[self._human_name]['search']['competence'] -= 0.1  # Human failed to report an obstacle
+                    trustBeliefs[self._human_name]['search']['competence'] -= 0.3  # Human failed to report an obstacle
+                    #print(f"Didn't report obstacle{room}")
                 elif human_reported_obstacle:
                     trustBeliefs[self._human_name]['search'][
-                        'competence'] += 0.2  # Human correctly reported an obstacle
+                        'competence'] += 0.1  # Human correctly reported an obstacle
 
-                human_reported_victim = any('Found' in msg for msg in area_rec_messages[room])
+                human_reported_victim = any('Found' in msg and not 'blocking' in msg for msg in area_rec_messages[room])
                 robot_found_victim = any('Found' in msg and 'in' in msg for msg in area_sent_messages[room])
                 human_rescued_victim = any('Collect' in msg for msg in area_rec_messages[room])
 
                 if robot_found_victim and not (human_reported_victim or human_rescued_victim):
                     trustBeliefs[self._human_name]['search'][
-                        'competence'] -= 0.1  # Human failed to report or rescue a victim
+                        'competence'] -= 0.3  # Human failed to report or rescue a victim
+                    #print(f"Didn't report or rescue victim {room}")
                 elif human_reported_victim or human_rescued_victim:
                     trustBeliefs[self._human_name]['search'][
-                        'competence'] += 0.2  # Human correctly reported or rescued a victim
+                        'competence'] += 0.1  # Human correctly reported or rescued a victim
+
+                # If nothing was announced and nothing was found, increase competence
+                if (not robot_found_victim and not robot_found_obstacle
+                        and not human_reported_victim and not human_reported_obstacle
+                        and not human_rescued_victim):
+                    trustBeliefs[self._human_name]['search']['competence'] += 0.1
+        #print(
+        #    f"Updated belief: {trustBeliefs[self._human_name]['search']['competence']}, {trustBeliefs[self._human_name]['search']['willingness']}")
 
     def _send_message(self, mssg, sender):
         """
