@@ -1034,8 +1034,8 @@ class BaselineAgent(ArtificialBrain):
                 room_number = int(regex_extractor.group(2))
                 area_rec_messages[room_number].append(message)
             elif message.startswith('Remove:'):  # remove obstacle
-                regex_extractor = re.search(r"Remove: (.*?) at (\d+)", message)
-                room_number = int(regex_extractor.group(2))
+                regex_extractor = re.search(r"Remove: at (\d+)", message)
+                room_number = int(regex_extractor.group(1))
                 area_rec_messages[room_number].append(message)
         for message in self._send_messages:
             # print(message)
