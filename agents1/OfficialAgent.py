@@ -989,8 +989,10 @@ class BaselineAgent(ArtificialBrain):
         # Update the trust value based on for example the received messages
         # Since `receivedMessages` is a list of all messages,
         # some messages will be counted many times, so we reset the trust values to defaults here.
-        trustBeliefs[self._human_name]['search']['competence'] = self._default_trust_value
-        trustBeliefs[self._human_name]['search']['willingness'] = self._default_trust_value
+
+        # trustBeliefs[self._human_name]['search']['competence'] = self._default_trust_value
+        # trustBeliefs[self._human_name]['search']['willingness'] = self._default_trust_value
+        print(f"Current belief: {trustBeliefs[self._human_name]['search']['competence']}, {trustBeliefs[self._human_name]['search']['willingness']}")
 
         area_rec_messages = {}
         area_sent_messages = {}
@@ -1053,21 +1055,25 @@ class BaselineAgent(ArtificialBrain):
 
                 # If the robot finds an obstacle not called out by the human
                 if robot_found_obstacle and not human_reported_obstacle:
-                    trustBeliefs[self._human_name]['search']['competence'] -= 0.1  # Human failed to report an obstacle
+                    trustBeliefs[self._human_name]['search']['competence'] -= 0.3  # Human failed to report an obstacle
+                    print(f"Didn't report obstacle{room}")
                 elif human_reported_obstacle:
                     trustBeliefs[self._human_name]['search'][
-                        'competence'] += 0.2  # Human correctly reported an obstacle
+                        'competence'] += 0.1  # Human correctly reported an obstacle
 
-                human_reported_victim = any('Found' in msg for msg in area_rec_messages[room])
+                human_reported_victim = any('Found' in msg and not 'blocking' in msg for msg in area_rec_messages[room])
                 robot_found_victim = any('Found' in msg and 'in' in msg for msg in area_sent_messages[room])
                 human_rescued_victim = any('Collect' in msg for msg in area_rec_messages[room])
 
                 if robot_found_victim and not (human_reported_victim or human_rescued_victim):
                     trustBeliefs[self._human_name]['search'][
-                        'competence'] -= 0.1  # Human failed to report or rescue a victim
+                        'competence'] -= 0.3  # Human failed to report or rescue a victim
+                    print(f"Didn't report or rescue victim {room}")
                 elif human_reported_victim or human_rescued_victim:
                     trustBeliefs[self._human_name]['search'][
-                        'competence'] += 0.2  # Human correctly reported or rescued a victim
+                        'competence'] += 0.1  # Human correctly reported or rescued a victim
+        print(
+            f"Updated belief: {trustBeliefs[self._human_name]['search']['competence']}, {trustBeliefs[self._human_name]['search']['willingness']}")
 
     def _send_message(self, mssg, sender):
         """
