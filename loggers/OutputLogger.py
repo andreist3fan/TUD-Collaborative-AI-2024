@@ -67,7 +67,7 @@ def output_logger(fld):
 
     evaluation_plots(recent_dir)
     completion_pct_plots(recent_dir)
-
+    trust_evolution_rounds_plots()
 
 def evaluation_plots(recent_dir):
     files = glob.glob(os.path.join(recent_dir, 'world_1/evaluation_*'))
@@ -153,4 +153,39 @@ def completion_pct_plots(recent_dir):
     # Save and show
     plt.tight_layout()  # Adjust layout to prevent overlap
     plt.savefig(os.path.join(recent_dir, 'world_1/completion_pct_plot.png'))
+    plt.show()
+
+
+def trust_evolution_rounds_plots():
+    filepath = 'beliefs/allTrustBeliefs.csv'
+    if not os.path.exists(filepath):
+        print(f"No trust beliefs found in {filepath}")
+        return
+    rows = []
+    with open (filepath) as csv_file:
+        reader = csv.reader(csv_file, delimiter=';', quotechar="'")
+        for row in reader:
+            rows.append(row)
+    if len(rows) <= 0:
+        return
+    rows = [row for row in rows if len(row) > 1]
+    last_played_name = rows[-1][0]
+    beliefs = [row for row in rows if row[0] == last_played_name]
+    search_competence = [float(row[2]) for row in beliefs if row[1] == 'search']
+    search_willingness = [float(row[3]) for row in beliefs if row[1] == 'search']
+
+    #rescue_competence = [float(row[2]) for row in beliefs if row[1] == 'rescue']
+    #rescue_willingness = [float(row[3]) for row in beliefs if row[1] == 'rescue']
+
+    plt.figure(figsize=(10, 5))
+    plt.plot(search_competence, marker='o', linestyle='-', label='Search Competence')
+    plt.plot(search_willingness, marker='o', linestyle='-', label='Search Willingness')
+    plt.xlabel("Rounds")
+    plt.ylabel("Trust")
+    plt.title("Trust Evolution Throughout the Rounds")
+    plt.legend()
+    plt.grid(True)
+
+    plt.tight_layout()  # Adjust layout to prevent overlap
+    plt.savefig('beliefs/trust_evolution_rounds.png')
     plt.show()
