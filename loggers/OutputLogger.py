@@ -66,6 +66,7 @@ def output_logger(fld):
         csv_writer.writerow([name,task,competence,willingness])
 
     evaluation_plots(recent_dir)
+    completion_pct_plots(recent_dir)
 
 
 def evaluation_plots(recent_dir):
@@ -120,4 +121,36 @@ def evaluation_plots(recent_dir):
     # Save and show
     plt.tight_layout()  # Adjust layout to prevent overlap
     plt.savefig(os.path.join(recent_dir, 'world_1/evaluation_plot.png'))
+    plt.show()
+
+
+def completion_pct_plots(recent_dir):
+    files = glob.glob(os.path.join(recent_dir, 'world_1/actions_*'))
+    if len(files) < 0:
+        return
+
+    completion_pct_filepath = files[0]
+    ticks = []
+    completion_pct = []
+    with open(completion_pct_filepath) as csv_file:
+        reader = csv.reader(csv_file, delimiter=';', quotechar="'")
+        header = next(reader)
+
+        for i, row in enumerate(reader):
+            if i % 100 == 0:
+                ticks.append(i)
+                completion_pct.append(float(row[1]))
+
+    plt.figure(figsize=(10, 5))
+
+    plt.plot(ticks, completion_pct, marker='o', linestyle='-', label=header[1])
+    plt.xlabel("Ticks")
+    plt.ylabel("Completion Percentage")
+    plt.title("Completion Percentage Throughout the Game")
+    plt.legend()
+    plt.grid(True)
+
+    # Save and show
+    plt.tight_layout()  # Adjust layout to prevent overlap
+    plt.savefig(os.path.join(recent_dir, 'world_1/completion_pct_plot.png'))
     plt.show()
