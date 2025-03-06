@@ -760,7 +760,7 @@ class BaselineAgent(ArtificialBrain):
                     -1] == 'Rescue alone' and 'mild' in self._recent_vic:
                     # I think we can say that we just do this, no need to look at trust here,
                     # because we trust ourselves to do this
-                    self._send_message('Picking up ' + self._recent_vic + ' in ' + self._door['room_name'] + '.',
+                    self._send_message('Picking up: ' + self._recent_vic + ' in ' + self._door['room_name'] + '.',
                                        'RescueBot')
                     self._rescue = 'alone'
                     self._answered = True
@@ -1176,7 +1176,9 @@ class BaselineAgent(ArtificialBrain):
                     cur_message = self._current_tick_received_messages[received_index][0]
                     received_index += 1
 
-            self.update_collected_victims(cur_message, claimed_saved, trustBeliefs)
+            self.match_collect(cur_message, claimed_saved, trustBeliefs)
+            self.match_picking_up(cur_message, claimed_saved, trustBeliefsoffi)
+
             self.check_if_collected_victim_found(cur_message, claimed_saved, trustBeliefs)
 
         for send_message, send_tick in [t for t in self._send_message_ticks if
@@ -1293,24 +1295,34 @@ class BaselineAgent(ArtificialBrain):
         victim = None
         if match:
             victim = " ".join(match.groups()).replace(':', '')  # Join the words into a single string
-        if victim in claimed_saved:
-            trustBeliefs[self._human_name]['rescue_yellow']['competence'] -= 0.3
-            trustBeliefs[self._human_name]['rescue_yellow']['willingness'] -= 0.3
+            if victim in claimed_saved:
+                trustBeliefs[self._human_name]['rescue_yellow']['competence'] -= 0.3
+                trustBeliefs[self._human_name]['rescue_yellow']['willingness'] -= 0.3
 
-    def update_collected_victims(self, send_message, claimed_saved, trustBeliefs):
+    def match_collect(self,send_message, claimed_saved, trustBeliefs):
+        match = re.search(r'Collect:\s+(\w+)\s+(\w+)\s+(\w+)', send_message)
+        self.update_collected_victims(claimed_saved, trustBeliefs, match)
+
+    def match_picking_up(self,send_message, claimed_saved, trustBeliefs):
+        match = re.search(r'Picking up:\s+(\w+)\s+(\w+)\s+(\w+)', send_message)
+        self.update_collected_victims(claimed_saved, trustBeliefs, match)
+
+    def update_collected_victims(self, claimed_saved, trustBeliefs, match):
         #I think this needs to be updated to facilitate for the victims that the robot picks up
         #I do not think this is happening right now, also new messages for picking up victims
-        match = re.search(r'Collect:\s+(\w+)\s+(\w+)\s+(\w+)', send_message)
-        victim = ''
-        if match:
-            victim = " ".join(match.groups())  # Join the words into a single string
-            #this needs to be here so that victim is not empty if there is a match only, otherwise,
-            # it will happen all the time
-            if victim not in claimed_saved:
-                claimed_saved.append(victim)
-            else:
-                trustBeliefs[self._human_name]['rescue_yellow']['competence'] -= 0.1
-                trustBeliefs[self._human_name]['rescue_yellow']['willingness'] -= 0.1
+        if not match:
+            return
+
+        victim = " ".join(match.groups())  # Join the words into a single string
+        #this needs to be here so that victim is not empty if there is a match only, otherwise,
+        # it will happen all the time
+        if victim not in claimed_saved:
+            claimed_saved.append(victim)
+
+        else:
+            trustBeliefs[self._human_name]['rescue_yellow']['competence'] -= 0.1
+            trustBeliefs[self._human_name]['rescue_yellow']['willingness'] -= 0.1
+
 
     def trustBeliefSearch(self, receivedMessages, trustBeliefs):
         # Update the trust value based on for example the received messages
