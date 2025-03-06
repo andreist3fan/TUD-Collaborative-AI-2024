@@ -200,6 +200,7 @@ class BaselineAgent(ArtificialBrain):
                     return None, {}
 
             if Phase.FIND_NEXT_GOAL == self._phase:
+                print('phase find next goal entered')
                 # Definition of some relevant variables
                 self._answered = False
                 self._goal_vic = None
@@ -267,6 +268,7 @@ class BaselineAgent(ArtificialBrain):
                         self._phase = Phase.PICK_UNSEARCHED_ROOM
 
             if Phase.PICK_UNSEARCHED_ROOM == self._phase:
+                print("In phase pick unseearch room entered")
                 agent_location = state[self.agent_id]['location']
                 # Identify which areas are not explored yet
                 unsearched_rooms = [room['room_name'] for room in state.values()
@@ -309,6 +311,8 @@ class BaselineAgent(ArtificialBrain):
                         self._phase = Phase.PLAN_PATH_TO_ROOM
 
             if Phase.PLAN_PATH_TO_ROOM == self._phase:
+                print("In phase plan path to room entered")
+
                 # Reset the navigator for a new path planning
                 self._navigator.reset_full()
 
@@ -340,6 +344,7 @@ class BaselineAgent(ArtificialBrain):
                 self._phase = Phase.FOLLOW_PATH_TO_ROOM
 
             if Phase.FOLLOW_PATH_TO_ROOM == self._phase:
+                print("In phase follow path to room entered")
                 # Check if the previously identified target victim was rescued by the human
                 if self._goal_vic and self._goal_vic in self._collected_victims:
                     # Reset current door and switch to finding the next goal
@@ -407,6 +412,8 @@ class BaselineAgent(ArtificialBrain):
                     self._phase = Phase.REMOVE_OBSTACLE_IF_NEEDED
 
             if Phase.REMOVE_OBSTACLE_IF_NEEDED == self._phase:
+                print("In phase remove obstacle entered")
+
                 objects = []
                 agent_location = state[self.agent_id]['location']
                 # Identify which obstacle is blocking the entrance
@@ -572,6 +579,7 @@ class BaselineAgent(ArtificialBrain):
                     self._phase = Phase.ENTER_ROOM
 
             if Phase.ENTER_ROOM == self._phase:
+                print("In phase enter room entered")
                 self._answered = False
 
                 # Check if the target victim has been rescued by the human, and switch to finding the next goal
@@ -601,6 +609,8 @@ class BaselineAgent(ArtificialBrain):
                     self._phase = Phase.PLAN_ROOM_SEARCH_PATH
 
             if Phase.PLAN_ROOM_SEARCH_PATH == self._phase:
+                print("In phase plan_room_search_path entered")
+
                 # Extract the numeric location from the room name and set it as the agent's location
                 self._agent_loc = int(self._door['room_name'].split()[-1])
 
@@ -621,6 +631,7 @@ class BaselineAgent(ArtificialBrain):
                 self._phase = Phase.FOLLOW_ROOM_SEARCH_PATH
 
             if Phase.FOLLOW_ROOM_SEARCH_PATH == self._phase:
+                print("In phase follow room search path entered")
                 # Search the area
                 self._state_tracker.update(state)
                 action = self._navigator.get_move_action(self._state_tracker)
@@ -667,6 +678,7 @@ class BaselineAgent(ArtificialBrain):
                                         self._searched_rooms).replace('area ', '') + '\n \
                                         clock - extra time when rescuing alone: 15 seconds \n afstand - distance between us: ' + self._distance_human,
                                                        'RescueBot')
+                                    self.robot_found = True
                                     self._waiting = True
 
                                 # TODO: we can send messages here that the agent has not come yet maybe? or define another phase
@@ -678,6 +690,7 @@ class BaselineAgent(ArtificialBrain):
                                                                       '') + ' \n safe - victims rescued: ' + str(
                                         self._collected_victims) + '\n \
                                         afstand - distance between us: ' + self._distance_human, 'RescueBot')
+                                    self.robot_found = True
                                     self._waiting = True
                                     # Execute move actions to explore the area
                     return action, {}
@@ -812,6 +825,8 @@ class BaselineAgent(ArtificialBrain):
                 return Idle.__name__, {'duration_in_ticks': 25}
 
             if Phase.PLAN_PATH_TO_VICTIM == self._phase:
+                print("In phase plan path to victim entered")
+
                 # Plan the path to a found victim using its location
                 self._navigator.reset_full()
                 self._navigator.add_waypoints([self._found_victim_logs[self._goal_vic]['location']])
@@ -819,6 +834,8 @@ class BaselineAgent(ArtificialBrain):
                 self._phase = Phase.FOLLOW_PATH_TO_VICTIM
 
             if Phase.FOLLOW_PATH_TO_VICTIM == self._phase:
+                print("In phase follow path to victim entered")
+
                 # Start searching for other victims if the human already rescued the target victim
                 if self._goal_vic and self._goal_vic in self._collected_victims:
                     self._phase = Phase.FIND_NEXT_GOAL
@@ -834,6 +851,7 @@ class BaselineAgent(ArtificialBrain):
                     self._phase = Phase.TAKE_VICTIM
 
             if Phase.TAKE_VICTIM == self._phase:
+                print("In phase take victim entered")
                 # Store all area tiles in a list
                 room_tiles = [info['location'] for info in state.values()
                               if 'class_inheritance' in info
@@ -860,7 +878,8 @@ class BaselineAgent(ArtificialBrain):
                         'class_inheritance'] and 'mild' in info['obj_id'] and info['location'] in self._roomtiles:
                         objects.append(info)
                         # Remain idle when the human has not arrived at the location
-                        if not self.robot_found and not self._human_name in info['name'] and not self._take_victim_repeat:
+                        if (self.robot_found and self._human_name not in info['name']
+                                and not self._take_victim_repeat):
                             # TODO: time it takes for human to arrive if we have called him, this needs more testing
                             #  for loops and normal performance
 
