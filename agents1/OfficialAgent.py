@@ -863,15 +863,15 @@ class BaselineAgent(ArtificialBrain):
                             if 'mild' in info['obj_id']:
                                 combined_trust = (0.5 * trustBeliefs[self._human_name]['rescue_yellow']['willingness']
                                                   + 0.5 * trustBeliefs[self._human_name]['rescue_yellow']['competence'])
-                                weTrust = self.probability_trust(combined_trust)
+                                we_trust = self.probability_trust(combined_trust)
                                 self._send_message('Human agent not present at location to save mild victim together', "RescueBot")
                             else:
                                 combined_trust = (0.5 * trustBeliefs[self._human_name]['rescue_red']['willingness']
                                                   + 0.5 * trustBeliefs[self._human_name]['rescue_red']['competence'])
-                                weTrust = self.probability_trust(combined_trust)
+                                we_trust = self.probability_trust(combined_trust)
                                 self._send_message('Human agent not present at location to save critical victim together', "RescueBot")
 
-                            if weTrust:
+                            if we_trust:
                                 self._waiting = True
                                 self._moving = False
                                 self._send_message("Waiting for human to come pick up victim together",
@@ -903,7 +903,7 @@ class BaselineAgent(ArtificialBrain):
                 if self._take_victim_repeat:
                     self._rescue = 'alone'
                 self._take_victim_repeat = False
-                # TODO: maybe make decision to start without waiting on the person
+                
                 # Add the victim to the list of rescued victims when it has been picked up
                 if self._goal_vic and len(objects) == 0 and 'critical' in self._goal_vic or len(
                         objects) == 0 and 'mild' in self._goal_vic and self._rescue == 'together':
@@ -961,7 +961,7 @@ class BaselineAgent(ArtificialBrain):
 
     def probability_trust(self, trust_value):
         prob_trust = (trust_value + 1) / 2
-        prob_trust = np.clip(prob_trust, 0.01, 0.99)
+        prob_trust = np.clip(prob_trust, 0.01, 1)
         # Generate a single random True/False
         trust_state = np.random.choice([True, False], p=[prob_trust, 1 - prob_trust])
         return trust_state
