@@ -75,6 +75,7 @@ class BaselineAgent(ArtificialBrain):
         self._received_messages = []
         self._moving = False
         self._default_trust_value = 0
+        self.robot_found = False
         # avoid loops and unnecessary checks in phase.take_victim
         self._take_victim_repeat = False
 
@@ -449,6 +450,7 @@ class BaselineAgent(ArtificialBrain):
                                 self._send_message(
                                     'Please come to ' + str(self._door['room_name']) + ' to remove rock.',
                                     'RescueBot')
+
                                 return None, {}
                             # Tell the human to remove the obstacle when he/she arrives
                             if state[{'is_human_agent': True}]:
@@ -707,6 +709,8 @@ class BaselineAgent(ArtificialBrain):
                         if not state[{'is_human_agent': True}]:
                             self._send_message('Please come to ' + str(self._door['room_name']) + ' to carry ' + str(
                                 self._recent_vic) + ' together.', 'RescueBot')
+                            self.robot_found = True
+
                         # Tell the human to carry the critically injured victim together
                         if state[{'is_human_agent': True}]:
                             self._send_message('Lets carry ' + str(
@@ -737,6 +741,7 @@ class BaselineAgent(ArtificialBrain):
                         if not state[{'is_human_agent': True}]:
                             self._send_message('Please come to ' + str(self._door['room_name']) + ' to carry ' + str(
                                 self._recent_vic) + ' together.', 'RescueBot')
+                            self.robot_found = True
                         # Tell the human to carry the mildly injured victim together
                         if state[{'is_human_agent': True}]:
                             self._send_message('Lets carry ' + str(
@@ -851,8 +856,7 @@ class BaselineAgent(ArtificialBrain):
                         'class_inheritance'] and 'mild' in info['obj_id'] and info['location'] in self._roomtiles:
                         objects.append(info)
                         # Remain idle when the human has not arrived at the location
-                        if not self._human_name in info['name'] and not self._take_victim_repeat:
-                            # TODO: human is not in place when we arrive when he calls us
+                        if not self.robot_found and not self._human_name in info['name'] and not self._take_victim_repeat:
                             # TODO: time it takes for human to arrive if we have called him, this needs more testing
                             #  for loops and normal performance
 
@@ -894,7 +898,7 @@ class BaselineAgent(ArtificialBrain):
                                     self._phase = Phase.PICK_UNSEARCHED_ROOM
                                     self._send_message("Human not present will not wait; Proceeding to next goal",
                                                        "RescueBot")
-
+                    self.robot_found = False
 
                 if self._take_victim_repeat:
                     self._rescue = 'alone'
@@ -1177,7 +1181,7 @@ class BaselineAgent(ArtificialBrain):
                     received_index += 1
 
             self.match_collect(cur_message, claimed_saved, trustBeliefs)
-            self.match_picking_up(cur_message, claimed_saved, trustBeliefsoffi)
+            self.match_picking_up(cur_message, claimed_saved, trustBeliefs)
 
             self.check_if_collected_victim_found(cur_message, claimed_saved, trustBeliefs)
 
