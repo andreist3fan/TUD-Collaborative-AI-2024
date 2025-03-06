@@ -76,15 +76,18 @@ class BaselineAgent(ArtificialBrain):
 
         # Define the type of trust values the agent has
         # You can choose from 'Trust_Belief', 'Never_Trust', 'Always_Trust', 'Random_Trust'
-        self.type = 'Trust_Belief'
+        self.type = 'Random_Trust'
 
+
+
+    def _default_trust_value(self):
         default_trust_type = {
             'Trust_Belief': 0,
             'Never_Trust': -1,
             'Always_Trust': 1,
             'Random_Trust': random.uniform(-1, 1)
         }
-        self._default_trust_value = default_trust_type[self.type]
+        return default_trust_type[self.type]
 
 
     def initialize(self):
@@ -983,8 +986,8 @@ class BaselineAgent(ArtificialBrain):
             if self._human_name not in trustBeliefs:
                 trustBeliefs[self._human_name] = {}
 
-                competence = self._default_trust_value
-                willingness = self._default_trust_value
+                competence = self._default_trust_value()
+                willingness = self._default_trust_value()
                 trustBeliefs[self._human_name]['search'] = {'competence': competence, 'willingness': willingness}
 
         return trustBeliefs
