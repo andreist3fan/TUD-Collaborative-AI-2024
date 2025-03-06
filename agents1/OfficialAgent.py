@@ -1042,6 +1042,7 @@ class BaselineAgent(ArtificialBrain):
                     loc = 'area ' + msg.split()[-1]
                     # Add the area to the memory of searched areas
                     if loc not in self._searched_rooms:
+                        self._send_message("Victim was not communicated as found", "RescueBot")
                         self._searched_rooms.add(loc)
                     # Add the victim and location to the memory of found victims
                     if collectVic not in self._found_victims:
@@ -1165,6 +1166,18 @@ class BaselineAgent(ArtificialBrain):
         send_index = 0
         received_index = 0
         for i in range(0, len(self._current_tick_received_messages) + len(self._send_message_ticks)):
+            if i < len(self._send_message_ticks):
+                if 'Human agent not present at location to save mild victim together' == self._send_message_ticks[i][0]:
+                    trustBeliefs[self._human_name]['rescue_yellow']['willingness'] -= 0.2
+                    trustBeliefs[self._human_name]['rescue_yellow']['competence'] -= 0.2
+                elif 'Human agent not present at location to save critical victim together' == self._send_message_ticks[i][0]:
+                    trustBeliefs[self._human_name]['rescue_red']['willingness'] -= 0.2
+                    trustBeliefs[self._human_name]['rescue_red']['competence'] -= 0.2
+                elif 'Victim was not communicated as found' in self._send_message_ticks[i][0]:
+                    trustBeliefs[self._human_name]['rescue_yellow']['competence'] -= 0.05
+                    trustBeliefs[self._human_name]['rescue_yellow']['willingness'] += 0.05
+
+
             if send_index == len(self._send_message_ticks):
                 cur_message = self._current_tick_received_messages[received_index][0]
                 received_index += 1
@@ -1188,17 +1201,9 @@ class BaselineAgent(ArtificialBrain):
         for send_message, send_tick in [t for t in self._send_message_ticks if
                                         'Found' and 'injured' in t[0] and 'removal' not in t[0]]:
 
-            if 'Human agent not present at location to save mild victim together' == self._send_message:
-                trustBeliefs[self._human_name]['rescue_yellow']['willingness'] -= 0.1
-                trustBeliefs[self._human_name]['rescue_yellow']['competence'] -= 0.1
-            if 'Human agent not present at location to save critical victim together' == self._send_message:
-                trustBeliefs[self._human_name]['rescue_red']['willingness'] -= 0.1
-                trustBeliefs[self._human_name]['rescue_red']['competence'] -= 0.1
+
             next_received_messages = self.find_next_received(send_tick)
             for response, resp_tick in next_received_messages:
-                if 'Victim was not communicated as found' in send_message:
-                    trustBeliefs[self._human_name]['rescue_yellow']['competence'] -= 0.05
-                    trustBeliefs[self._human_name]['rescue_yellow']['willingness'] += 0.05
 
                 if 'Found mild' in send_message:
                     if not given_relevant_response_in_time_yellow:
