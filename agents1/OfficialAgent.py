@@ -184,7 +184,6 @@ class BaselineAgent(ArtificialBrain):
             # print(self._phase)
             # print('Ticks:' + str(state['World']['nr_ticks']))
 
-
             if Phase.INTRO == self._phase:
                 # Send introduction message
                 self._send_message('Hello! My name is RescueBot. Together we will collaborate and try to search and rescue the 8 victims on our right as quickly as possible. \
@@ -871,6 +870,10 @@ class BaselineAgent(ArtificialBrain):
                             if weTrust:
                                 self._waiting = True
                                 self._moving = False
+                                self._send_message("Waiting for human to come pick up victim together",
+                                                   "RescueBot")
+                                return None, {}
+
                             else:
                                 if 'mild' in info['obj_id']:
                                     self._answered = True
@@ -882,21 +885,23 @@ class BaselineAgent(ArtificialBrain):
                                     self._recent_vic = None
                                     self._phase = Phase.PLAN_PATH_TO_VICTIM
                                     self._take_victim_repeat = True
+
                                 else:
+                                    self._take_victim_repeat = False
                                     self._waiting = False
-                                    self._moving = True
-                                    self._phase = Phase.FIND_NEXT_GOAL
+                                    self._recent_vic = None
+                                    self._goal_vic = None
+                                    self._phase = Phase.PICK_UNSEARCHED_ROOM
                                     self._send_message("Human not present will not wait; Proceeding to next goal",
                                                        "RescueBot")
-                                    # return Idle.__name__, {'duration_in_ticks': 25}
 
-                            return None, {}
+
                 if self._take_victim_repeat:
                     self._rescue = 'alone'
                 self._take_victim_repeat = False
                 # TODO: maybe make decision to start without waiting on the person
                 # Add the victim to the list of rescued victims when it has been picked up
-                if len(objects) == 0 and 'critical' in self._goal_vic or len(
+                if self._goal_vic and len(objects) == 0 and 'critical' in self._goal_vic or len(
                         objects) == 0 and 'mild' in self._goal_vic and self._rescue == 'together':
                     self._waiting = False
                     if self._goal_vic not in self._collected_victims:
@@ -906,7 +911,7 @@ class BaselineAgent(ArtificialBrain):
                     self._phase = Phase.FIND_NEXT_GOAL
                 # When rescuing mildly injured victims alone, pick the victim up and plan the path to the drop zone
 
-                if 'mild' in self._goal_vic and self._rescue == 'alone':
+                if self._goal_vic and 'mild' in self._goal_vic and self._rescue == 'alone':
                     self._phase = Phase.PLAN_PATH_TO_DROPPOINT
                     if self._goal_vic not in self._collected_victims:
                         self._collected_victims.append(self._goal_vic)
@@ -1156,13 +1161,6 @@ class BaselineAgent(ArtificialBrain):
         send_index = 0
         received_index = 0
         for i in range(0, len(self._current_tick_received_messages) + len(self._send_message_ticks)):
-            if 'Human agent not present at location to save mild victim together' == self._send_message_ticks[i][0]:
-                trustBeliefs[self._human_name]['rescue_yellow']['willingness'] -= 0.1
-                trustBeliefs[self._human_name]['rescue_yellow']['competence'] -= 0.1
-            if 'Human agent not present at location to save critical victim together' == self._send_message_ticks[i][0]:
-                trustBeliefs[self._human_name]['rescue_red']['willingness'] -= 0.1
-                trustBeliefs[self._human_name]['rescue_red']['competence'] -= 0.1
-
             if send_index == len(self._send_message_ticks):
                 cur_message = self._current_tick_received_messages[received_index][0]
                 received_index += 1
@@ -1184,6 +1182,12 @@ class BaselineAgent(ArtificialBrain):
         for send_message, send_tick in [t for t in self._send_message_ticks if
                                         'Found' and 'injured' in t[0] and 'removal' not in t[0]]:
 
+            if 'Human agent not present at location to save mild victim together' == self._send_message:
+                trustBeliefs[self._human_name]['rescue_yellow']['willingness'] -= 0.1
+                trustBeliefs[self._human_name]['rescue_yellow']['competence'] -= 0.1
+            if 'Human agent not present at location to save critical victim together' == self._send_message:
+                trustBeliefs[self._human_name]['rescue_red']['willingness'] -= 0.1
+                trustBeliefs[self._human_name]['rescue_red']['competence'] -= 0.1
             next_received_messages = self.find_next_received(send_tick)
             for response, resp_tick in next_received_messages:
                 if 'Found mild' in send_message:
