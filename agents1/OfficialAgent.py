@@ -76,7 +76,7 @@ class BaselineAgent(ArtificialBrain):
 
         # Define the type of trust values the agent has
         # You can choose from 'Trust_Belief', 'Never_Trust', 'Always_Trust', 'Random_Trust'
-        self.type = 'Random_Trust'
+        self.type = 'Trust_Belief'
 
 
 
