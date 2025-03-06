@@ -1045,7 +1045,7 @@ class BaselineAgent(ArtificialBrain):
                         self._searched_rooms.add(loc)
                     # Add the victim and location to the memory of found victims
                     if collectVic not in self._found_victims:
-                        # TODO: update trust based on the fact that he collected without communicating finding first for search maybe
+                        self._send_message("Victim was not communicated as found", "RescueBot")
                         self._found_victims.append(collectVic)
                         self._found_victim_logs[collectVic] = {'room': loc}
                     if collectVic in self._found_victims and self._found_victim_logs[collectVic]['room'] != loc:
@@ -1196,6 +1196,10 @@ class BaselineAgent(ArtificialBrain):
                 trustBeliefs[self._human_name]['rescue_red']['competence'] -= 0.1
             next_received_messages = self.find_next_received(send_tick)
             for response, resp_tick in next_received_messages:
+                if 'Victim was not communicated as found' in send_message:
+                    trustBeliefs[self._human_name]['rescue_yellow']['competence'] -= 0.05
+                    trustBeliefs[self._human_name]['rescue_yellow']['willingness'] += 0.05
+
                 if 'Found mild' in send_message:
                     if not given_relevant_response_in_time_yellow:
                         # Extract "distance between us"
