@@ -1104,8 +1104,12 @@ class BaselineAgent(ArtificialBrain):
         '''
         Baseline implementation of a trust belief. Creates a dictionary with trust belief scores for each team member, for example based on the received messages.
         '''
-        if len(receivedMessages) == 0:
-            return
+        # for some reason values for the trust for rescue are not updated properly for red
+        # and I think for yellow, they drop to -1 really fast for some reason, need to look into that
+        # I think we are probably updating them sometimes when we should not be updating them, error in the
+        # if statements again possibly
+        # if len(receivedMessages) == 0:
+        #     return
         tick_nr = self._state['World']['nr_ticks']
         _distance_drop = 'far'
         if self._agent_loc in [1, 2, 5, 6, 8, 9, 11, 12]:
