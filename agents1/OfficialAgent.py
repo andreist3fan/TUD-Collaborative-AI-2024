@@ -75,6 +75,7 @@ class BaselineAgent(ArtificialBrain):
         self._received_messages = []
         self._moving = False
         self._default_trust_value = 0
+        # avoid loops and unnecessary checks in phase.take_victim
         self._take_victim_repeat = False
 
         self._lookup_table = {
