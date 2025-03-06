@@ -1207,7 +1207,7 @@ class BaselineAgent(ArtificialBrain):
             self.check_if_collected_victim_found(cur_message, claimed_saved, trustBeliefs)
 
         for send_message, send_tick in [t for t in self._send_message_ticks if
-                                        'Found' and 'injured' in t[0] and 'removal' not in t[0]]:
+                                        t.startsWith('Found') and 'injured' in t[0] and 'blocking' not in t[0]]:
 
 
             next_received_messages = self.find_next_received(send_tick)
@@ -1261,7 +1261,7 @@ class BaselineAgent(ArtificialBrain):
                                 trustBeliefs[self._human_name]['rescue_red']['competence'] -= 0.1
                                 trustBeliefs[self._human_name]['rescue_red']['willingness'] -= 0.1
 
-        for rec_message, rec_tick in [t for t in self._send_message_ticks if 'Found:' in t[0]]:
+        for rec_message, rec_tick in [t for t in self._current_tick_received_messages if 'Found:' in t[0]]:
             next_received_messages = self.find_next_received(rec_tick)
             if 'mild' in rec_message:
                 next_message_length = 2 if (len(next_received_messages) >= 2) else len(next_received_messages)
