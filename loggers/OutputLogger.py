@@ -51,6 +51,10 @@ def output_logger(fld):
     task = trustfile_contents[-1]['task']
     competence = trustfile_contents[-1]['competence']
     willingness = trustfile_contents[-1]['willingness']
+
+
+
+
     # Retrieve the number of ticks to finish the task, score, and completeness
     no_ticks = action_contents[-1]['tick_nr']
     score = action_contents[-1]['score']
@@ -63,7 +67,17 @@ def output_logger(fld):
         csv_writer.writerow([completeness,score,no_ticks,len(unique_agent_actions),len(unique_human_actions)])
     with open(fld + '/beliefs/allTrustBeliefs.csv', mode='a+') as csv_file:
         csv_writer = csv.writer(csv_file, delimiter=';', quotechar='"', quoting=csv.QUOTE_MINIMAL)
-        csv_writer.writerow([name,task,competence,willingness])
+        csv_writer.writerow([trustfile_contents[0]['name'], trustfile_contents[0]['task'],
+                             trustfile_contents[0]['competence'],
+                             trustfile_contents[0]['willingness']])
+        csv_writer.writerow([trustfile_contents[1]['name'], trustfile_contents[1]['task'],
+                             trustfile_contents[1]['competence'],
+                             trustfile_contents[1]['willingness']])
+        csv_writer.writerow([trustfile_contents[2]['name'], trustfile_contents[2]['task'],
+                             trustfile_contents[2]['competence'],
+                             trustfile_contents[2]['willingness']])
+
+
 
     evaluation_plots(recent_dir)
     completion_pct_plots(recent_dir)
@@ -95,8 +109,10 @@ def evaluation_plots(recent_dir):
                 trust_beliefs[header[2]].append(float(row[2]))
                 trust_beliefs[header[3]].append(float(row[3]))
                 trust_beliefs[header[4]].append(float(row[4]))
+                trust_beliefs[header[5]].append(float(row[5]))
+                trust_beliefs[header[6]].append(float(row[6]))
 
-    plt.figure(figsize=(10, 10))
+    plt.figure(figsize=(10, 15))
 
     # Create a plot for the search task
     plt.subplot(2, 1, 1)  # (rows, columns, index) → First subplot
@@ -114,7 +130,17 @@ def evaluation_plots(recent_dir):
     plt.plot(ticks, trust_beliefs[header[4]], marker='o', linestyle='-', label=header[4])
     plt.xlabel("Ticks")
     plt.ylabel("Trust")
-    plt.title("Rescue Trust Values Throughout the Game")
+    plt.title("Rescue Trust Values for Critically Injured Victims Throughout the Game")
+    plt.legend()
+    plt.grid(True)
+
+    # Second plot: header[3] and header[4]
+    plt.subplot(2, 1, 3)  # Second subplot below the first one
+    plt.plot(ticks, trust_beliefs[header[5]], marker='o', linestyle='-', label=header[3])
+    plt.plot(ticks, trust_beliefs[header[6]], marker='o', linestyle='-', label=header[4])
+    plt.xlabel("Ticks")
+    plt.ylabel("Trust")
+    plt.title("Rescue Trust Values for Mildly Injured Victims Throughout the Game")
     plt.legend()
     plt.grid(True)
 
