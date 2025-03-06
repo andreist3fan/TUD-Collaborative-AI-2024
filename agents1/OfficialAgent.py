@@ -73,7 +73,22 @@ class BaselineAgent(ArtificialBrain):
         self._recent_vic = None
         self._received_messages = []
         self._moving = False
-        self._default_trust_value = 0
+
+        # Define the type of trust values the agent has
+        # You can choose from 'Trust_Belief', 'Never_Trust', 'Always_Trust', 'Random_Trust'
+        self.type = 'Trust_Belief'
+
+
+
+    def _default_trust_value(self):
+        default_trust_type = {
+            'Trust_Belief': 0,
+            'Never_Trust': -1,
+            'Always_Trust': 1,
+            'Random_Trust': random.uniform(-1, 1)
+        }
+        return default_trust_type[self.type]
+
 
     def initialize(self):
         # Initialization of the state tracker and navigation algorithm
@@ -971,8 +986,8 @@ class BaselineAgent(ArtificialBrain):
             if self._human_name not in trustBeliefs:
                 trustBeliefs[self._human_name] = {}
 
-                competence = self._default_trust_value
-                willingness = self._default_trust_value
+                competence = self._default_trust_value()
+                willingness = self._default_trust_value()
                 trustBeliefs[self._human_name]['search'] = {'competence': competence, 'willingness': willingness}
 
         return trustBeliefs
@@ -981,11 +996,14 @@ class BaselineAgent(ArtificialBrain):
         '''
         Baseline implementation of a trust belief. Creates a dictionary with trust belief scores for each team member, for example based on the received messages.
         '''
-        self.trustBeliefSearch(receivedMessages, trustBeliefs)
+        # Update the trust belief only if it's not one of the baselines
+        if self.type == 'TrustBelief':
 
-        # Restrict the competence and wilingness beliefs to a range of -1 to 1
-        trustBeliefs[self._human_name]['search']['competence'] = np.clip(trustBeliefs[self._human_name]['search']['competence'], -1, 1)
-        trustBeliefs[self._human_name]['search']['willingness'] = np.clip(trustBeliefs[self._human_name]['search']['willingness'], -1, 1)
+            self.trustBeliefSearch(receivedMessages, trustBeliefs)
+
+            # Restrict the competence and wilingness beliefs to a range of -1 to 1
+            trustBeliefs[self._human_name]['search']['competence'] = np.clip(trustBeliefs[self._human_name]['search']['competence'], -1, 1)
+            trustBeliefs[self._human_name]['search']['willingness'] = np.clip(trustBeliefs[self._human_name]['search']['willingness'], -1, 1)
 
         # Save current trust belief values so we can later use and retrieve them to add to a csv file with all the logged trust belief values
         with open(folder + '/beliefs/currentTrustBelief.csv', mode='w') as csv_file:
@@ -1066,11 +1084,11 @@ class BaselineAgent(ArtificialBrain):
 
                 # If the robot finds an obstacle not called out by the human
                 if robot_found_obstacle and not human_reported_obstacle:
-                    trustBeliefs[self._human_name]['search']['competence'] -= 0.3  # Human failed to report an obstacle
+                    trustBeliefs[self._human_name]['search']['willingness'] -= 0.3  # Human failed to report an obstacle
                     #print(f"Didn't report obstacle{room}")
                 elif human_reported_obstacle:
                     trustBeliefs[self._human_name]['search'][
-                        'competence'] += 0.1  # Human correctly reported an obstacle
+                        'willingness'] += 0.1  # Human correctly reported an obstacle
 
                 human_reported_victim = any('Found' in msg and not 'blocking' in msg for msg in area_rec_messages[room])
                 robot_found_victim = any('Found' in msg and 'in' in msg for msg in area_sent_messages[room])
@@ -1078,11 +1096,11 @@ class BaselineAgent(ArtificialBrain):
 
                 if robot_found_victim and not (human_reported_victim or human_rescued_victim):
                     trustBeliefs[self._human_name]['search'][
-                        'competence'] -= 0.3  # Human failed to report or rescue a victim
+                        'willingness'] -= 0.3  # Human failed to report or rescue a victim
                     #print(f"Didn't report or rescue victim {room}")
                 elif human_reported_victim or human_rescued_victim:
                     trustBeliefs[self._human_name]['search'][
-                        'competence'] += 0.1  # Human correctly reported or rescued a victim
+                        'willingness'] += 0.1  # Human correctly reported or rescued a victim
 
                 # If nothing was announced and nothing was found, increase competence
                 if (not robot_found_victim and not robot_found_obstacle
