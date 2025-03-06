@@ -98,6 +98,9 @@ def evaluation_plots(recent_dir):
         trust_beliefs[header[2]] = []
         trust_beliefs[header[3]] = []
         trust_beliefs[header[4]] = []
+        trust_beliefs[header[5]] = []
+        trust_beliefs[header[6]] = []
+
 
         # skip over the first row
         next(reader)
