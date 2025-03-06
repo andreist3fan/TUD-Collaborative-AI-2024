@@ -78,6 +78,9 @@ class BaselineAgent(ArtificialBrain):
         self.robot_found = False
         # avoid loops and unnecessary checks in phase.take_victim
         self._take_victim_repeat = False
+        self._last_length_received_messages = 0
+        self._last_length_send_messages = 0
+
 
         self._lookup_table = {
             "Mild": {
@@ -280,7 +283,9 @@ class BaselineAgent(ArtificialBrain):
                 if self._remainingZones and len(unsearched_rooms) == 0:
                     self._to_search = []
                     self._searched_rooms = set()
+                    self._last_length_send_messages = len(self._send_messages)
                     self._send_messages = []
+                    self._last_length_received_messages = len(self.received_messages)
                     self.received_messages = []
                     self.received_messages_content = []
                     self._send_message('Going to re-search all areas.', 'RescueBot')
@@ -1183,12 +1188,12 @@ class BaselineAgent(ArtificialBrain):
             _distance_drop = 'close'
         self._tick_distance_goal[tick_nr] = _distance_drop
 
-        diffLen = len(receivedMessages) - len(self._current_tick_received_messages)
+        diffLen = len(receivedMessages) + self._last_length_received_messages - len(self._current_tick_received_messages)
         new_messages = receivedMessages[-diffLen:] if diffLen > 0 else []
         for message in new_messages:
             self._current_tick_received_messages.append((message, tick_nr))
 
-        diffLen_send = len(self._send_messages) - len(self._send_message_ticks)
+        diffLen_send = len(self._send_messages) + self._last_length_send_messages - len(self._send_message_ticks)
         new_messages = self._send_messages[-diffLen_send:] if diffLen_send > 0 else []
         for message in new_messages:
             self._send_message_ticks.append((message, tick_nr))
