@@ -1207,7 +1207,7 @@ class BaselineAgent(ArtificialBrain):
             self.check_if_collected_victim_found(cur_message, claimed_saved, trustBeliefs)
 
         for send_message, send_tick in [t for t in self._send_message_ticks if
-                                        t.startsWith('Found') and 'injured' in t[0] and 'blocking' not in t[0]]:
+                                        t[0].startswith('Found') and 'injured' in t[0] and 'blocking' not in t[0]]:
 
 
             next_received_messages = self.find_next_received(send_tick)
