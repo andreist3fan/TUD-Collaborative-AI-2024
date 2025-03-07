@@ -1318,14 +1318,14 @@ class BaselineAgent(ArtificialBrain):
         for rec_message, rec_tick in [t for t in self._current_tick_received_messages if 'Found:' in t[0]]:
             next_received_messages = self.find_next_received(rec_tick)
             if 'mild' in rec_message:
-                regex_extractor = re.search(r"Found: (.*?) in (\d+)", message)
+                regex_extractor = re.search(r"Found: (.*?) in (\d+)", rec_message)
                 found_victim = regex_extractor.group(1)
                 next_message_length = 2 if (len(next_received_messages) >= 2) else len(next_received_messages)
                 collected_victim = False
                 if next_message_length>1:
                     for i in range(0, next_message_length):
                         if 'Collect' in next_received_messages[i][0]:
-                            regex_extractor = re.search(r"Collect: (.*?) in (\d+)", message)
+                            regex_extractor = re.search(r"Collect: (.*?) in (\d+)", next_received_messages[i][0])
                             collected = regex_extractor.group(1)
                             if collected == found_victim:
                                 print('collect in response threshold')

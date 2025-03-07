@@ -203,12 +203,21 @@ def trust_evolution_rounds_plots():
     search_competence = [float(row[2]) for row in beliefs if row[1] == 'search']
     search_willingness = [float(row[3]) for row in beliefs if row[1] == 'search']
 
-    rescue_competence = [float(row[2]) for row in beliefs if row[1] == 'rescue_red']
-    rescue_willingness = [float(row[3]) for row in beliefs if row[1] == 'rescue_red']
+    rescue_red_competence = [float(row[2]) for row in beliefs if row[1] == 'rescue_red']
+    rescue_red_willingness = [float(row[3]) for row in beliefs if row[1] == 'rescue_red']
+
+    rescue_yellow_competence = [float(row[2]) for row in beliefs if row[1] == 'rescue_yellow']
+    rescue_yellow_willingness = [float(row[3]) for row in beliefs if row[1] == 'rescue_yellow']
 
     plt.figure(figsize=(10, 5))
     plt.plot(search_competence, marker='o', linestyle='-', label='Search Competence')
     plt.plot(search_willingness, marker='o', linestyle='-', label='Search Willingness')
+
+    plt.plot(rescue_red_willingness, marker='o', linestyle='-', label='Rescue Red Willingness')
+    plt.plot(rescue_red_competence, marker='o', linestyle='-', label='Rescue Red Competence')
+    plt.plot(rescue_yellow_willingness, marker='o', linestyle='-', label='Rescue Yellow Willingness')
+    plt.plot(rescue_yellow_competence, marker='o', linestyle='-', label='Rescue Yellow Competence')
+
     plt.xlabel("Rounds")
     plt.ylabel("Trust")
     plt.title("Trust Evolution Throughout the Rounds")
