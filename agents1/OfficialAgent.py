@@ -81,6 +81,7 @@ class BaselineAgent(ArtificialBrain):
         self._last_length_received_messages = 0
         self._last_length_send_messages = 0
         self._found_victim_tick = np.inf
+        self._updated_time_carry = False
 
 
 
@@ -181,8 +182,13 @@ class BaselineAgent(ArtificialBrain):
                 if info['is_carrying'][0]['img_name'][8:-4] not in self._collected_victims:
                     self._collected_victims.append(info['is_carrying'][0]['img_name'][8:-4])
                 self._carrying_together = True
+                time_to_arrive = self._found_victim_tick - state['World']['nr_ticks']
+                if not self._updated_time_carry:
+                    self._updated_time_carry = True
+                    self._send_message('Carrying victim together with human' + info['is_carrying'][0]['obj_id'] + 'after waiting' + str(time_to_arrive), 'RescueBot')
             if 'is_human_agent' in info and self._human_name in info['name'] and len(info['is_carrying']) == 0:
                 self._carrying_together = False
+                self._updated_time_carry = False
         # If carrying a victim together, let agent be idle (because joint actions are essentially carried out by the human)
         if self._carrying_together == True:
             return None, {}
@@ -740,6 +746,7 @@ class BaselineAgent(ArtificialBrain):
 
                         # Tell the human to carry the critically injured victim together
                         if state[{'is_human_agent': True}]:
+                            #check for this message for positive trust update
                             self._send_message('Lets carry ' + str(
                                 self._recent_vic) + ' together! Please wait until I moved on top of ' + str(
                                 self._recent_vic) + '.', 'RescueBot')
@@ -751,7 +758,8 @@ class BaselineAgent(ArtificialBrain):
                     else:
                         self._answered = True
                         self._waiting = False
-                        self._send_message('I do not trust you enough to rely on you to save red victim right now'
+                        self._send_message('I do not trust you enough to rely on you to save red victim right now,'
+                                           ' will come back to it later'
                                            , 'RescueBot')
                         self._todo.append(self._recent_vic)
                         self._recent_vic = None
@@ -774,6 +782,7 @@ class BaselineAgent(ArtificialBrain):
                                 self._recent_vic) + ' together.', 'RescueBot')
                             self._found_victim_tick = state['World']['nr_ticks']
                         # Tell the human to carry the mildly injured victim together
+                        #TODO: update trust positive based on this message
                         if state[{'is_human_agent': True}]:
                             self._send_message('Lets carry ' + str(
                                 self._recent_vic) + ' together! Please wait until I moved on top of ' + str(
@@ -899,8 +908,7 @@ class BaselineAgent(ArtificialBrain):
                         if self.robot_found:
 
                             if self._human_name not in info['name']:
-                                if state['World']['nr_ticks'] - self._found_victim_tick > 100:
-                                    print('Stopped waiting for human')
+                                if state['World']['nr_ticks'] - self._found_victim_tick > 500:
                                     self._found_victim_tick = np.inf
                                     # self._answered = True
                                     self._waiting = False
@@ -909,11 +917,14 @@ class BaselineAgent(ArtificialBrain):
                                     self._goal_vic = None
                                     self._recent_vic = None
                                     self._phase = Phase.FIND_NEXT_GOAL
-                                    return Idle.__name__, {'duration_in_ticks': 25}
+                                    return None, {}
                                 else:
+                                    print('waiting')
+                                    print(state['World']['nr_ticks'] - self._found_victim_tick)
                                     self._waiting = True
                                     self._moving = False
                                     return None, {}
+
 
                                 # Remain idle when the human has not arrived at the location
                                 # if we call the human, we are willing to wait a certain amount of time based on trust
@@ -1024,8 +1035,6 @@ class BaselineAgent(ArtificialBrain):
                 # Drop the victim on the correct location on the drop zone
                 return Drop.__name__, {'human_name': self._human_name}
 
-            if Phase.WAIT_FOR_HUMAN == self._phase:
-                print("Chackam nehranimajkoto veche chas")
 
 
     def probability_trust(self, trust_value):
