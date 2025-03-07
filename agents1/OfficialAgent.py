@@ -1089,11 +1089,13 @@ class BaselineAgent(ArtificialBrain):
                     loc = 'area ' + msg.split()[-1]
                     # Add the area to the memory of searched areas
                     if loc not in self._searched_rooms:
-                        self._send_message("Victim was not communicated as found", "RescueBot")
+                        #this does not work due to the threshold for trusting in search
+                        # self._send_message("Victim was not communicated as found", "RescueBot")
                         self._searched_rooms.add(loc)
                     # Add the victim and location to the memory of found victims
                     if collectVic not in self._found_victims:
-                        self._send_message("Victim was not communicated as found", "RescueBot")
+                        #this does not work due to the threshold for trusting in search
+                        # self._send_message("Victim was not communicated as found", "RescueBot")
                         self._found_victims.append(collectVic)
                         self._found_victim_logs[collectVic] = {'room': loc}
                     if collectVic in self._found_victims and self._found_victim_logs[collectVic]['room'] != loc:
@@ -1316,18 +1318,24 @@ class BaselineAgent(ArtificialBrain):
         for rec_message, rec_tick in [t for t in self._current_tick_received_messages if 'Found:' in t[0]]:
             next_received_messages = self.find_next_received(rec_tick)
             if 'mild' in rec_message:
+                regex_extractor = re.search(r"Found: (.*?) in (\d+)", message)
+                found_victim = regex_extractor.group(1)
                 next_message_length = 2 if (len(next_received_messages) >= 2) else len(next_received_messages)
                 collected_victim = False
-                for i in range(0, next_message_length):
-                    if 'Collect' in next_received_messages[i]:
-                        print('collect in response threshold')
-                        collected_victim = True
-                        trustBeliefs[self._human_name]['rescue_red']['competence'] += 0.1
-                        trustBeliefs[self._human_name]['rescue_red']['willingness'] += 0.1
-                if not collected_victim:
-                    print('not collect in response threshold')
-                    trustBeliefs[self._human_name]['rescue_red']['competence'] -= 0.1
-                    trustBeliefs[self._human_name]['rescue_red']['willingness'] -= 0.1
+                if next_message_length>1:
+                    for i in range(0, next_message_length):
+                        if 'Collect' in next_received_messages[i][0]:
+                            regex_extractor = re.search(r"Collect: (.*?) in (\d+)", message)
+                            collected = regex_extractor.group(1)
+                            if collected == found_victim:
+                                print('collect in response threshold')
+                                collected_victim = True
+                                trustBeliefs[self._human_name]['rescue_yellow']['competence'] += 0.2
+                                trustBeliefs[self._human_name]['rescue_yellow']['willingness'] += 0.2
+                    if not collected_victim:
+                        print('not collect in response threshold')
+                        trustBeliefs[self._human_name]['rescue_yellow']['competence'] -= 0.1
+                        trustBeliefs[self._human_name]['rescue_yellow']['willingness'] -= 0.1
 
         self.trustBeliefSearch(receivedMessages, trustBeliefs)
 
@@ -1393,7 +1401,6 @@ class BaselineAgent(ArtificialBrain):
         # it will happen all the time
         if victim not in claimed_saved:
             claimed_saved.append(victim)
-
         else:
             trustBeliefs[self._human_name]['rescue_yellow']['competence'] -= 0.1
             trustBeliefs[self._human_name]['rescue_yellow']['willingness'] -= 0.1

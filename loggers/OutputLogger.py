@@ -139,8 +139,8 @@ def evaluation_plots(recent_dir):
 
     # Second plot: header[3] and header[4]
     plt.subplot(3, 1, 3)  # Second subplot below the first one
-    plt.plot(ticks, trust_beliefs[header[5]], marker='o', linestyle='-', label=header[3])
-    plt.plot(ticks, trust_beliefs[header[6]], marker='o', linestyle='-', label=header[4])
+    plt.plot(ticks, trust_beliefs[header[5]], marker='o', linestyle='-', label=header[5])
+    plt.plot(ticks, trust_beliefs[header[6]], marker='o', linestyle='-', label=header[6])
     plt.xlabel("Ticks")
     plt.ylabel("Trust")
     plt.title("Rescue Trust Values for Mildly Injured Victims Throughout the Game")
