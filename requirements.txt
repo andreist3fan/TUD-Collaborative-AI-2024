@@ -17,6 +17,5 @@ Werkzeug       == 2.0.0
 flask          == 2.1.3
 matplotlib     == 3.4
 
-
 # Other libraries requested by students and added to make sure
 # Everyone uses the same versions.

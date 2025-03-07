@@ -35,7 +35,7 @@ class Phase(enum.Enum):
 
 
 class BaselineAgent(ArtificialBrain):
-    def __init__(self, slowdown, condition, name, folder):
+    def __init__(self, slowdown, condition, name, folder, agent_type):
         super().__init__(slowdown, condition, name, folder)
         # Initialization of some relevant variables
         self._current_tick_received_messages = []
@@ -74,18 +74,18 @@ class BaselineAgent(ArtificialBrain):
         self._recent_vic = None
         self._received_messages = []
         self._moving = False
-        self._default_trust_value = 0
         self.robot_found = False
         # avoid loops and unnecessary checks in phase.take_victim
         self._take_victim_repeat = False
         self._last_length_received_messages = 0
         self._last_length_send_messages = 0
-
         self._found_victim_tick = np.inf
         self._updated_time_carry = False
         self._max_wait_time = 0
 
-
+        # Define the type of trust values the agent has
+        # You can choose from 'Trust_Belief', 'Never_Trust', 'Always_Trust', 'Random_Trust'
+        self.type = agent_type
 
         self._lookup_table = {
             "Mild": {
@@ -124,6 +124,14 @@ class BaselineAgent(ArtificialBrain):
                 },
             },
         }
+    def _default_trust_value(self):
+        default_trust_type = {
+            'trust': 0,
+            'never': -1,
+            'always': 1,
+            'random': random.uniform(-1, 1)
+        }
+        return default_trust_type[self.type]
 
     def initialize(self):
         # Initialization of the state tracker and navigation algorithm
@@ -1234,244 +1242,252 @@ class BaselineAgent(ArtificialBrain):
             if self._human_name not in trustBeliefs:
                 trustBeliefs[self._human_name] = {}
 
-                competence = self._default_trust_value
-                willingness = self._default_trust_value
-                trustBeliefs[self._human_name]['search'] = {'competence': competence, 'willingness': willingness}
-                trustBeliefs[self._human_name]['rescue_red'] = {'competence': competence,
-                                                                'willingness': willingness}
-                trustBeliefs[self._human_name]['rescue_yellow'] = {'competence': competence,
-                                                                   'willingness': willingness}
+                s_competence = self._default_trust_value()
+                s_willingness = self._default_trust_value()
+                r_r_competence = self._default_trust_value()
+                r_r_willingness = self._default_trust_value()
+                r_y_competence = self._default_trust_value()
+                r_y_willingness = self._default_trust_value()
+
+                trustBeliefs[self._human_name]['search'] = {'competence': s_competence, 'willingness': s_willingness}
+                trustBeliefs[self._human_name]['rescue_red'] = {'competence': r_r_competence,
+                                                                'willingness': r_r_willingness}
+                trustBeliefs[self._human_name]['rescue_yellow'] = {'competence': r_y_competence,
+                                                                   'willingness': r_y_willingness}
         return trustBeliefs
 
     def _trustBelief(self, members, trustBeliefs, folder, receivedMessages):
         '''
         Baseline implementation of a trust belief. Creates a dictionary with trust belief scores for each team member, for example based on the received messages.
         '''
-        # for some reason values for the trust for rescue are not updated properly for red
-        # and I think for yellow, they drop to -1 really fast for some reason, need to look into that
-        # I think we are probably updating them sometimes when we should not be updating them, error in the
-        # if statements again possibly
-        # if len(receivedMessages) == 0:
-        #     return
-        tick_nr = self._state['World']['nr_ticks']
-        _distance_drop = 'far'
-        if self._agent_loc in [1, 2, 5, 6, 8, 9, 11, 12]:
-            _distance_drop = 'far'
-        if self._agent_loc in [3, 4, 7, 10, 13, 14]:
-            _distance_drop = 'close'
-        self._tick_distance_goal[tick_nr] = _distance_drop
+        # Update the trust belief only if it's not one of the baselines
+        if self.type == 'trust':
 
-        diffLen = len(receivedMessages) + self._last_length_received_messages - len(self._current_tick_received_messages)
-        new_messages = receivedMessages[-diffLen:] if diffLen > 0 else []
-        for message in new_messages:
-            self._current_tick_received_messages.append((message, tick_nr))
+          # for some reason values for the trust for rescue are not updated properly for red
+          # and I think for yellow, they drop to -1 really fast for some reason, need to look into that
+          # I think we are probably updating them sometimes when we should not be updating them, error in the
+          # if statements again possibly
+          # if len(receivedMessages) == 0:
+          #     return
+          tick_nr = self._state['World']['nr_ticks']
+          _distance_drop = 'far'
+          if self._agent_loc in [1, 2, 5, 6, 8, 9, 11, 12]:
+              _distance_drop = 'far'
+          if self._agent_loc in [3, 4, 7, 10, 13, 14]:
+              _distance_drop = 'close'
+          self._tick_distance_goal[tick_nr] = _distance_drop
 
-        diffLen_send = len(self._send_messages) + self._last_length_send_messages - len(self._send_message_ticks)
-        new_messages = self._send_messages[-diffLen_send:] if diffLen_send > 0 else []
-        for message in new_messages:
-            self._send_message_ticks.append((message, tick_nr))
+          diffLen = len(receivedMessages) + self._last_length_received_messages - len(self._current_tick_received_messages)
+          new_messages = receivedMessages[-diffLen:] if diffLen > 0 else []
+          for message in new_messages:
+              self._current_tick_received_messages.append((message, tick_nr))
 
-        # we can use the time it takes to do it alone if applicable to be the time to wait/correspond to it
-        relevant_response_time_threshold_yellow = 400
-        relevant_response_time_threshold_red = 400
-        given_relevant_response_in_time_red = False
-        given_relevant_response_in_time_yellow = False
-        claimed_saved = []
+          diffLen_send = len(self._send_messages) + self._last_length_send_messages - len(self._send_message_ticks)
+          new_messages = self._send_messages[-diffLen_send:] if diffLen_send > 0 else []
+          for message in new_messages:
+              self._send_message_ticks.append((message, tick_nr))
 
-        send_index = 0
-        received_index = 0
-        for i in range(0, len(self._current_tick_received_messages) + len(self._send_message_ticks)):
-            if i < len(self._send_message_ticks):
-                msg = self._send_message_ticks[i][0]
-                if 'Human agent not present at location to save mild victim together' == msg:
-                    # print("Gave up on task")
-                    trustBeliefs[self._human_name]['rescue_yellow']['willingness'] -= 0.2
-                    trustBeliefs[self._human_name]['rescue_yellow']['competence'] -= 0.2
-                elif 'Human agent not present at location to save critical victim together' == msg:
-                    # print("Gave up on critical task")
-                    trustBeliefs[self._human_name]['rescue_red']['willingness'] -= 0.2
-                    trustBeliefs[self._human_name]['rescue_red']['competence'] -= 0.2
-                elif 'Victim was not communicated as found' in msg:
-                    # print("Did not follow sequence of tasks")
-                    trustBeliefs[self._human_name]['rescue_yellow']['competence'] -= 0.05
-                    trustBeliefs[self._human_name]['rescue_yellow']['willingness'] += 0.1
-                elif msg.startswith('Carrying'):
-                    match = re.findall(r'waiting (\d+) with max waiting time of (\d+)', msg)
-                    waiting_time = 0
-                    max_waiting_time = 0
-                    if match:
-                        waiting_time, max_waiting_time = map(int, match[0])
-                    interval = max_waiting_time / 3
-                    mid = interval*2
+          # we can use the time it takes to do it alone if applicable to be the time to wait/correspond to it
+          relevant_response_time_threshold_yellow = 400
+          relevant_response_time_threshold_red = 400
+          given_relevant_response_in_time_red = False
+          given_relevant_response_in_time_yellow = False
+          claimed_saved = []
 
-                    if 'mild' in msg:
-                        if waiting_time <= interval:
-                            trustBeliefs[self._human_name]['rescue_yellow']['competence'] += 0.3
-                            trustBeliefs[self._human_name]['rescue_yellow']['willingness'] += 0.3
-                        elif interval < waiting_time <= mid:
-                            trustBeliefs[self._human_name]['rescue_yellow']['competence'] += 0.1
-                            trustBeliefs[self._human_name]['rescue_yellow']['willingness'] += 0.1
-                        else:
-                            if waiting_time <= interval:
-                                trustBeliefs[self._human_name]['rescue_yellow']['competence'] -= 0.1
-                                trustBeliefs[self._human_name]['rescue_yellow']['willingness'] -= 0.1
+          send_index = 0
+          received_index = 0
+          for i in range(0, len(self._current_tick_received_messages) + len(self._send_message_ticks)):
+              if i < len(self._send_message_ticks):
+                  msg = self._send_message_ticks[i][0]
+                  if 'Human agent not present at location to save mild victim together' == msg:
+                      # print("Gave up on task")
+                      trustBeliefs[self._human_name]['rescue_yellow']['willingness'] -= 0.2
+                      trustBeliefs[self._human_name]['rescue_yellow']['competence'] -= 0.2
+                  elif 'Human agent not present at location to save critical victim together' == msg:
+                      # print("Gave up on critical task")
+                      trustBeliefs[self._human_name]['rescue_red']['willingness'] -= 0.2
+                      trustBeliefs[self._human_name]['rescue_red']['competence'] -= 0.2
+                  elif 'Victim was not communicated as found' in msg:
+                      # print("Did not follow sequence of tasks")
+                      trustBeliefs[self._human_name]['rescue_yellow']['competence'] -= 0.05
+                      trustBeliefs[self._human_name]['rescue_yellow']['willingness'] += 0.1
+                  elif msg.startswith('Carrying'):
+                      match = re.findall(r'waiting (\d+) with max waiting time of (\d+)', msg)
+                      waiting_time = 0
+                      max_waiting_time = 0
+                      if match:
+                          waiting_time, max_waiting_time = map(int, match[0])
+                      interval = max_waiting_time / 3
+                      mid = interval*2
 
-                    if 'critical' in msg:
-                        if waiting_time <= interval:
-                            trustBeliefs[self._human_name]['rescue_red']['competence'] += 0.3
-                            trustBeliefs[self._human_name]['rescue_red']['willingness'] += 0.3
-                        elif interval < waiting_time <= mid:
-                            trustBeliefs[self._human_name]['rescue_red']['competence'] += 0.1
-                            trustBeliefs[self._human_name]['rescue_red']['willingness'] += 0.1
-                        else:
-                            if waiting_time <= interval:
-                                trustBeliefs[self._human_name]['rescue_red']['competence'] -= 0.1
-                                trustBeliefs[self._human_name]['rescue_red']['willingness'] -= 0.1
+                      if 'mild' in msg:
+                          if waiting_time <= interval:
+                              trustBeliefs[self._human_name]['rescue_yellow']['competence'] += 0.3
+                              trustBeliefs[self._human_name]['rescue_yellow']['willingness'] += 0.3
+                          elif interval < waiting_time <= mid:
+                              trustBeliefs[self._human_name]['rescue_yellow']['competence'] += 0.1
+                              trustBeliefs[self._human_name]['rescue_yellow']['willingness'] += 0.1
+                          else:
+                              if waiting_time <= interval:
+                                  trustBeliefs[self._human_name]['rescue_yellow']['competence'] -= 0.1
+                                  trustBeliefs[self._human_name]['rescue_yellow']['willingness'] -= 0.1
 
-                elif 'Human did not' in msg:
-                    if 'mild' in msg:
-                        trustBeliefs[self._human_name]['rescue_yellow']['competence'] -= 0.2
-                        trustBeliefs[self._human_name]['rescue_yellow']['willingness'] -= 0.2
-                    else:
-                        trustBeliefs[self._human_name]['rescue_red']['willingness'] -= 0.2
-                        trustBeliefs[self._human_name]['rescue_red']['competence'] -= 0.2
+                      if 'critical' in msg:
+                          if waiting_time <= interval:
+                              trustBeliefs[self._human_name]['rescue_red']['competence'] += 0.3
+                              trustBeliefs[self._human_name]['rescue_red']['willingness'] += 0.3
+                          elif interval < waiting_time <= mid:
+                              trustBeliefs[self._human_name]['rescue_red']['competence'] += 0.1
+                              trustBeliefs[self._human_name]['rescue_red']['willingness'] += 0.1
+                          else:
+                              if waiting_time <= interval:
+                                  trustBeliefs[self._human_name]['rescue_red']['competence'] -= 0.1
+                                  trustBeliefs[self._human_name]['rescue_red']['willingness'] -= 0.1
 
-            if send_index == len(self._send_message_ticks):
-                cur_message = self._current_tick_received_messages[received_index][0]
-                received_index += 1
+                  elif 'Human did not' in msg:
+                      if 'mild' in msg:
+                          trustBeliefs[self._human_name]['rescue_yellow']['competence'] -= 0.2
+                          trustBeliefs[self._human_name]['rescue_yellow']['willingness'] -= 0.2
+                      else:
+                          trustBeliefs[self._human_name]['rescue_red']['willingness'] -= 0.2
+                          trustBeliefs[self._human_name]['rescue_red']['competence'] -= 0.2
 
-            elif received_index == len(self._current_tick_received_messages):
-                cur_message = self._send_message_ticks[send_index][0]
-                send_index += 1
-            else:
-                if self._send_message_ticks[send_index][1] <= self._current_tick_received_messages[received_index][1]:
-                    cur_message = self._send_message_ticks[send_index][0]
-                    send_index += 1
-                else:
-                    cur_message = self._current_tick_received_messages[received_index][0]
-                    received_index += 1
+              if send_index == len(self._send_message_ticks):
+                  cur_message = self._current_tick_received_messages[received_index][0]
+                  received_index += 1
 
-            self.match_collect(cur_message, claimed_saved, trustBeliefs)
-            self.match_picking_up(cur_message, claimed_saved, trustBeliefs)
+              elif received_index == len(self._current_tick_received_messages):
+                  cur_message = self._send_message_ticks[send_index][0]
+                  send_index += 1
+              else:
+                  if self._send_message_ticks[send_index][1] <= self._current_tick_received_messages[received_index][1]:
+                      cur_message = self._send_message_ticks[send_index][0]
+                      send_index += 1
+                  else:
+                      cur_message = self._current_tick_received_messages[received_index][0]
+                      received_index += 1
 
-            self.check_if_collected_victim_found(cur_message, claimed_saved, trustBeliefs)
+              self.match_collect(cur_message, claimed_saved, trustBeliefs)
+              self.match_picking_up(cur_message, claimed_saved, trustBeliefs)
 
-        for send_message, send_tick in [t for t in self._send_message_ticks if
-                                        t[0].startswith('Found') and 'injured' in t[0] and 'blocking' not in t[0]]:
+              self.check_if_collected_victim_found(cur_message, claimed_saved, trustBeliefs)
+
+          for send_message, send_tick in [t for t in self._send_message_ticks if
+                                          t[0].startswith('Found') and 'injured' in t[0] and 'blocking' not in t[0]]:
 
 
-            next_received_messages = self.find_next_received(send_tick)
-            for response, resp_tick in next_received_messages:
+              next_received_messages = self.find_next_received(send_tick)
+              for response, resp_tick in next_received_messages:
 
-                if 'Found mild' in send_message:
-                    if not given_relevant_response_in_time_yellow:
-                        # Extract "distance between us"
-                        distance_match = re.search(r'distance between us: (\w+)', send_message)
-                        distance_human = distance_match.group(1) if distance_match else "far"
+                  if 'Found mild' in send_message:
+                      if not given_relevant_response_in_time_yellow:
+                          # Extract "distance between us"
+                          distance_match = re.search(r'distance between us: (\w+)', send_message)
+                          distance_human = distance_match.group(1) if distance_match else "far"
 
-                        if response in self._lookup_table['Mild'].keys():
-                            given_relevant_response_in_time_yellow = True
-                            # print('relevant response for mild to updated yellow values')
-                            trustBeliefs[self._human_name]['rescue_yellow']['competence'] += \
-                                self._lookup_table["Mild"][response][
-                                    (distance_human, self._tick_distance_goal[send_tick])][
-                                    'competence']
-                            trustBeliefs[self._human_name]['rescue_yellow']['willingness'] += \
-                                self._lookup_table["Mild"][response][
-                                    (distance_human, self._tick_distance_goal[send_tick])][
-                                    'willingness']
-                            trustBeliefs[self._human_name]['rescue_yellow']['willingness'] += 0.05
-                            trustBeliefs[self._human_name]['rescue_yellow']['competence'] += 0.05
-                        else:
-                            # print('not relevant response for mild to updated yellow values after tome')
-                            if resp_tick - send_tick > relevant_response_time_threshold_yellow:
-                                trustBeliefs[self._human_name]['rescue_yellow']['willingness'] -= 0.1
-                                trustBeliefs[self._human_name]['rescue_yellow']['competence'] -= 0.1
+                          if response in self._lookup_table['Mild'].keys():
+                              given_relevant_response_in_time_yellow = True
+                              # print('relevant response for mild to updated yellow values')
+                              trustBeliefs[self._human_name]['rescue_yellow']['competence'] += \
+                                  self._lookup_table["Mild"][response][
+                                      (distance_human, self._tick_distance_goal[send_tick])][
+                                      'competence']
+                              trustBeliefs[self._human_name]['rescue_yellow']['willingness'] += \
+                                  self._lookup_table["Mild"][response][
+                                      (distance_human, self._tick_distance_goal[send_tick])][
+                                      'willingness']
+                              trustBeliefs[self._human_name]['rescue_yellow']['willingness'] += 0.05
+                              trustBeliefs[self._human_name]['rescue_yellow']['competence'] += 0.05
+                          else:
+                              # print('not relevant response for mild to updated yellow values after tome')
+                              if resp_tick - send_tick > relevant_response_time_threshold_yellow:
+                                  trustBeliefs[self._human_name]['rescue_yellow']['willingness'] -= 0.1
+                                  trustBeliefs[self._human_name]['rescue_yellow']['competence'] -= 0.1
 
-                elif 'Found critical' in send_message:
-                    if not given_relevant_response_in_time_red:
+                  elif 'Found critical' in send_message:
+                      if not given_relevant_response_in_time_red:
 
-                        victims_match = re.search(r'safe - victims rescued: \[(.*?)\]', send_message)
-                        victims = victims_match.group(1).split(", ") if victims_match else []
+                          victims_match = re.search(r'safe - victims rescued: \[(.*?)\]', send_message)
+                          victims = victims_match.group(1).split(", ") if victims_match else []
 
-                        # Remove empty strings if no victims are present
-                        victims = [v for v in victims if v]
+                          # Remove empty strings if no victims are present
+                          victims = [v for v in victims if v]
 
-                        distance_match = re.search(r'distance between us: (\w+)', send_message)
-                        distance_human = distance_match.group(1) if distance_match else "far"
-                        if len(victims) > 5 and 'Continue' == response:
-                            trustBeliefs[self._human_name]['rescue_red']['competence'] -= 0.1
-                            trustBeliefs[self._human_name]['rescue_red']['willingness'] -= 0.1
+                          distance_match = re.search(r'distance between us: (\w+)', send_message)
+                          distance_human = distance_match.group(1) if distance_match else "far"
+                          if len(victims) > 5 and 'Continue' == response:
+                              trustBeliefs[self._human_name]['rescue_red']['competence'] -= 0.1
+                              trustBeliefs[self._human_name]['rescue_red']['willingness'] -= 0.1
 
-                        if response in self._lookup_table['Critical'].keys():
-                            # print('relevant response for critical to updated red values')
-                            given_relevant_response_in_time_red = True
-                            trustBeliefs[self._human_name]['rescue_red']['competence'] += \
-                                self._lookup_table["Critical"][response][
-                                    (distance_human, self._tick_distance_goal[send_tick])]['competence']
-                            trustBeliefs[self._human_name]['rescue_red']['willingness'] += \
-                                self._lookup_table["Critical"][response][
-                                    (distance_human, self._tick_distance_goal[send_tick])]['willingness']
-                            trustBeliefs[self._human_name]['rescue_red']['competence'] += 0.05
-                            trustBeliefs[self._human_name]['rescue_red']['willingness'] += 0.05
-                        else:
-                            # print('not relevant response for critical to updated red values after time')
-                            if resp_tick - send_tick > relevant_response_time_threshold_red:
-                                trustBeliefs[self._human_name]['rescue_red']['competence'] -= 0.1
-                                trustBeliefs[self._human_name]['rescue_red']['willingness'] -= 0.1
+                          if response in self._lookup_table['Critical'].keys():
+                              # print('relevant response for critical to updated red values')
+                              given_relevant_response_in_time_red = True
+                              trustBeliefs[self._human_name]['rescue_red']['competence'] += \
+                                  self._lookup_table["Critical"][response][
+                                      (distance_human, self._tick_distance_goal[send_tick])]['competence']
+                              trustBeliefs[self._human_name]['rescue_red']['willingness'] += \
+                                  self._lookup_table["Critical"][response][
+                                      (distance_human, self._tick_distance_goal[send_tick])]['willingness']
+                              trustBeliefs[self._human_name]['rescue_red']['competence'] += 0.05
+                              trustBeliefs[self._human_name]['rescue_red']['willingness'] += 0.05
+                          else:
+                              # print('not relevant response for critical to updated red values after time')
+                              if resp_tick - send_tick > relevant_response_time_threshold_red:
+                                  trustBeliefs[self._human_name]['rescue_red']['competence'] -= 0.1
+                                  trustBeliefs[self._human_name]['rescue_red']['willingness'] -= 0.1
 
-        for rec_message, rec_tick in [t for t in self._current_tick_received_messages if 'Found:' in t[0]]:
-            next_received_messages = self.find_next_received(rec_tick)
-            if 'mild' in rec_message:
-                regex_extractor = re.search(r"Found: (.*?) in (\d+)", rec_message)
-                found_victim = regex_extractor.group(1)
-                next_message_length = 2 if (len(next_received_messages) >= 2) else len(next_received_messages)
-                collected_victim = False
-                if next_message_length>1:
-                    for i in range(0, next_message_length):
-                        if 'Collect' in next_received_messages[i][0]:
-                            regex_extractor = re.search(r"Collect: (.*?) in (\d+)", next_received_messages[i][0])
-                            collected = regex_extractor.group(1)
-                            if collected == found_victim:
-                                # print('collect in response threshold')
-                                collected_victim = True
-                                trustBeliefs[self._human_name]['rescue_yellow']['competence'] += 0.2
-                                trustBeliefs[self._human_name]['rescue_yellow']['willingness'] += 0.2
-                    if not collected_victim:
-                        # print('not collect in response threshold')
-                        trustBeliefs[self._human_name]['rescue_yellow']['competence'] -= 0.1
-                        trustBeliefs[self._human_name]['rescue_yellow']['willingness'] -= 0.1
+          for rec_message, rec_tick in [t for t in self._current_tick_received_messages if 'Found:' in t[0]]:
+              next_received_messages = self.find_next_received(rec_tick)
+              if 'mild' in rec_message:
+                  regex_extractor = re.search(r"Found: (.*?) in (\d+)", rec_message)
+                  found_victim = regex_extractor.group(1)
+                  next_message_length = 2 if (len(next_received_messages) >= 2) else len(next_received_messages)
+                  collected_victim = False
+                  if next_message_length>1:
+                      for i in range(0, next_message_length):
+                          if 'Collect' in next_received_messages[i][0]:
+                              regex_extractor = re.search(r"Collect: (.*?) in (\d+)", next_received_messages[i][0])
+                              collected = regex_extractor.group(1)
+                              if collected == found_victim:
+                                  # print('collect in response threshold')
+                                  collected_victim = True
+                                  trustBeliefs[self._human_name]['rescue_yellow']['competence'] += 0.2
+                                  trustBeliefs[self._human_name]['rescue_yellow']['willingness'] += 0.2
+                      if not collected_victim:
+                          # print('not collect in response threshold')
+                          trustBeliefs[self._human_name]['rescue_yellow']['competence'] -= 0.1
+                          trustBeliefs[self._human_name]['rescue_yellow']['willingness'] -= 0.1
 
-        self.trustBeliefSearch(receivedMessages, trustBeliefs)
+          self.trustBeliefSearch(receivedMessages, trustBeliefs)
 
-        # Restrict the competence and willingness beliefs to a range of -1 to 1
-        trustBeliefs[self._human_name]['search']['competence'] = np.clip(
-            trustBeliefs[self._human_name]['search']['competence'], -1, 1)
-        trustBeliefs[self._human_name]['search']['willingness'] = np.clip(
-            trustBeliefs[self._human_name]['search']['willingness'], -1, 1)
+          # Restrict the competence and willingness beliefs to a range of -1 to 1
+          trustBeliefs[self._human_name]['search']['competence'] = np.clip(
+              trustBeliefs[self._human_name]['search']['competence'], -1, 1)
+          trustBeliefs[self._human_name]['search']['willingness'] = np.clip(
+              trustBeliefs[self._human_name]['search']['willingness'], -1, 1)
 
-        trustBeliefs[self._human_name]['rescue_red']['competence'] = np.clip(
-            trustBeliefs[self._human_name]['rescue_red']['competence'], -1, 1)
-        trustBeliefs[self._human_name]['rescue_red']['willingness'] = np.clip(
-            trustBeliefs[self._human_name]['rescue_red']['willingness'], -1, 1)
+          trustBeliefs[self._human_name]['rescue_red']['competence'] = np.clip(
+              trustBeliefs[self._human_name]['rescue_red']['competence'], -1, 1)
+          trustBeliefs[self._human_name]['rescue_red']['willingness'] = np.clip(
+              trustBeliefs[self._human_name]['rescue_red']['willingness'], -1, 1)
 
-        trustBeliefs[self._human_name]['rescue_yellow']['competence'] = np.clip(
-            trustBeliefs[self._human_name]['rescue_yellow']['competence'], -1, 1)
-        trustBeliefs[self._human_name]['rescue_yellow']['willingness'] = np.clip(
-            trustBeliefs[self._human_name]['rescue_yellow']['willingness'], -1, 1)
+          trustBeliefs[self._human_name]['rescue_yellow']['competence'] = np.clip(
+              trustBeliefs[self._human_name]['rescue_yellow']['competence'], -1, 1)
+          trustBeliefs[self._human_name]['rescue_yellow']['willingness'] = np.clip(
+              trustBeliefs[self._human_name]['rescue_yellow']['willingness'], -1, 1)
 
-        # Save current trust belief values so we can later use and retrieve them to add to a csv file with all the logged trust belief values
-        with open(folder + '/beliefs/currentTrustBelief.csv', mode='w') as csv_file:
-            csv_writer = csv.writer(csv_file, delimiter=';', quotechar='"', quoting=csv.QUOTE_MINIMAL)
-            csv_writer.writerow(['name', 'task', 'competence', 'willingness'])
-            csv_writer.writerow([self._human_name, 'search', trustBeliefs[self._human_name]['search']['competence'],
-                                 trustBeliefs[self._human_name]['search']['willingness']])
-            csv_writer.writerow([self._human_name, 'rescue_red',
-                                 trustBeliefs[self._human_name]['rescue_red']['competence'],
-                                 trustBeliefs[self._human_name]['rescue_red']['willingness']])
-            csv_writer.writerow([self._human_name, 'rescue_yellow',
-                                 trustBeliefs[self._human_name]['rescue_yellow']['competence'],
-                                 trustBeliefs[self._human_name]['rescue_yellow']['willingness']])
+          # Save current trust belief values so we can later use and retrieve them to add to a csv file with all the logged trust belief values
+          with open(folder + '/beliefs/currentTrustBelief.csv', mode='w') as csv_file:
+              csv_writer = csv.writer(csv_file, delimiter=';', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+              csv_writer.writerow(['name', 'task', 'competence', 'willingness'])
+              csv_writer.writerow([self._human_name, 'search', trustBeliefs[self._human_name]['search']['competence'],
+                                   trustBeliefs[self._human_name]['search']['willingness']])
+              csv_writer.writerow([self._human_name, 'rescue_red',
+                                   trustBeliefs[self._human_name]['rescue_red']['competence'],
+                                   trustBeliefs[self._human_name]['rescue_red']['willingness']])
+              csv_writer.writerow([self._human_name, 'rescue_yellow',
+                                   trustBeliefs[self._human_name]['rescue_yellow']['competence'],
+                                   trustBeliefs[self._human_name]['rescue_yellow']['willingness']])
 
         return trustBeliefs
 
@@ -1580,11 +1596,11 @@ class BaselineAgent(ArtificialBrain):
 
                 # If the robot finds an obstacle not called out by the human
                 if robot_found_obstacle and not human_reported_obstacle:
-                    trustBeliefs[self._human_name]['search']['competence'] -= 0.3  # Human failed to report an obstacle
+                    trustBeliefs[self._human_name]['search']['willingness'] -= 0.3  # Human failed to report an obstacle
                     #print(f"Didn't report obstacle{room}")
                 elif human_reported_obstacle:
                     trustBeliefs[self._human_name]['search'][
-                        'competence'] += 0.1  # Human correctly reported an obstacle
+                        'willingness'] += 0.1  # Human correctly reported an obstacle
 
                 human_reported_victim = any('Found' in msg and not 'blocking' in msg for msg in area_rec_messages[room])
                 robot_found_victim = any('Found' in msg and 'in' in msg for msg in area_sent_messages[room])
@@ -1592,11 +1608,11 @@ class BaselineAgent(ArtificialBrain):
 
                 if robot_found_victim and not (human_reported_victim or human_rescued_victim):
                     trustBeliefs[self._human_name]['search'][
-                        'competence'] -= 0.3  # Human failed to report or rescue a victim
+                        'willingness'] -= 0.3  # Human failed to report or rescue a victim
                     #print(f"Didn't report or rescue victim {room}")
                 elif human_reported_victim or human_rescued_victim:
                     trustBeliefs[self._human_name]['search'][
-                        'competence'] += 0.1  # Human correctly reported or rescued a victim
+                        'willingness'] += 0.1  # Human correctly reported or rescued a victim
 
                 # If nothing was announced and nothing was found, increase competence
                 if (not robot_found_victim and not robot_found_obstacle
