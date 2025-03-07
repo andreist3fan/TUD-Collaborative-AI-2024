@@ -121,6 +121,8 @@ class BaselineAgent(ArtificialBrain):
                 },
             },
         }
+        self.random_trust_persistence = None
+
     def _default_trust_value(self):
         default_trust_type = {
             'trust': 0,
@@ -1178,20 +1180,25 @@ class BaselineAgent(ArtificialBrain):
 
             # Initialize default trust values
             if self._human_name not in trustBeliefs:
-                trustBeliefs[self._human_name] = {}
+                if( (not self.type == 'random') or (self.type =='random' and self.random_trust_persistence is None)):
+                    print("RESET VALUES")
+                    trustBeliefs[self._human_name] = {}
 
-                s_competence = self._default_trust_value()
-                s_willingness = self._default_trust_value()
-                r_r_competence = self._default_trust_value()
-                r_r_willingness = self._default_trust_value()
-                r_y_competence = self._default_trust_value()
-                r_y_willingness = self._default_trust_value()
+                    s_competence = self._default_trust_value()
+                    s_willingness = self._default_trust_value()
+                    r_r_competence = self._default_trust_value()
+                    r_r_willingness = self._default_trust_value()
+                    r_y_competence = self._default_trust_value()
+                    r_y_willingness = self._default_trust_value()
 
-                trustBeliefs[self._human_name]['search'] = {'competence': s_competence, 'willingness': s_willingness}
-                trustBeliefs[self._human_name]['rescue_red'] = {'competence': r_r_competence,
-                                                                'willingness': r_r_willingness}
-                trustBeliefs[self._human_name]['rescue_yellow'] = {'competence': r_y_competence,
-                                                                   'willingness': r_y_willingness}
+                    trustBeliefs[self._human_name]['search'] = {'competence': s_competence, 'willingness': s_willingness}
+                    trustBeliefs[self._human_name]['rescue_red'] = {'competence': r_r_competence,
+                                                                    'willingness': r_r_willingness}
+                    trustBeliefs[self._human_name]['rescue_yellow'] = {'competence': r_y_competence,
+                                                                       'willingness': r_y_willingness}
+                    self.random_trust_persistence = trustBeliefs
+                else:
+                    trustBeliefs = self.random_trust_persistence
         return trustBeliefs
 
     def _trustBelief(self, members, trustBeliefs, folder, receivedMessages):
