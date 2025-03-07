@@ -33,7 +33,8 @@ class TrustEvaluationLogger(GridWorldLogger):
                     if name not in trustBeliefs:
                         trustBeliefs[name] = {}
                         trustBeliefs[name]['search'] = {'competence': 0, 'willingness': 0}
-                        trustBeliefs[name]['rescue'] = {'competence': 0, 'willingness': 0}
+                        trustBeliefs[name]['rescue_red'] = {'competence': 0, 'willingness': 0}
+                        trustBeliefs[name]['rescue_yellow'] = {'competence': 0, 'willingness': 0}
 
                     if task:
                         trustBeliefs[name][task] = {'competence': competence, 'willingness': willingness}
