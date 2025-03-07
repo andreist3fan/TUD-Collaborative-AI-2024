@@ -82,6 +82,7 @@ class BaselineAgent(ArtificialBrain):
         self._last_length_send_messages = 0
 
 
+
         self._lookup_table = {
             "Mild": {
                 "Rescue together": {
@@ -666,6 +667,9 @@ class BaselineAgent(ArtificialBrain):
                                 self._recent_vic = vic
                                 # Add the victim and the location to the corresponding dictionary
                                 self._found_victims.append(vic)
+                                # if it has been reported as collected, but was found again, remove from collected technically
+                                # if vic in self._collected_victims:
+                                #     self._collected_victims.remove(vic)
                                 self._found_victim_logs[vic] = {'location': info['location'],
                                                                 'room': self._door['room_name'],
                                                                 'obj_id': info['obj_id']}

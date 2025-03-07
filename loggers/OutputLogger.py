@@ -118,7 +118,7 @@ def evaluation_plots(recent_dir):
     plt.figure(figsize=(10, 15))
 
     # Create a plot for the search task
-    plt.subplot(2, 1, 1)  # (rows, columns, index) → First subplot
+    plt.subplot(3, 1, 1)  # (rows, columns, index) → First subplot
     plt.plot(ticks, trust_beliefs[header[1]], marker='o', linestyle='-', label=header[1])
     plt.plot(ticks, trust_beliefs[header[2]], marker='o', linestyle='-', label=header[2])
     plt.xlabel("Ticks")
@@ -128,7 +128,7 @@ def evaluation_plots(recent_dir):
     plt.grid(True)
 
     # Second plot: header[3] and header[4]
-    plt.subplot(2, 1, 2)  # Second subplot below the first one
+    plt.subplot(3, 1, 2)  # Second subplot below the first one
     plt.plot(ticks, trust_beliefs[header[3]], marker='o', linestyle='-', label=header[3])
     plt.plot(ticks, trust_beliefs[header[4]], marker='o', linestyle='-', label=header[4])
     plt.xlabel("Ticks")
@@ -138,7 +138,7 @@ def evaluation_plots(recent_dir):
     plt.grid(True)
 
     # Second plot: header[3] and header[4]
-    plt.subplot(2, 1, 3)  # Second subplot below the first one
+    plt.subplot(3, 1, 3)  # Second subplot below the first one
     plt.plot(ticks, trust_beliefs[header[5]], marker='o', linestyle='-', label=header[3])
     plt.plot(ticks, trust_beliefs[header[6]], marker='o', linestyle='-', label=header[4])
     plt.xlabel("Ticks")
@@ -203,8 +203,8 @@ def trust_evolution_rounds_plots():
     search_competence = [float(row[2]) for row in beliefs if row[1] == 'search']
     search_willingness = [float(row[3]) for row in beliefs if row[1] == 'search']
 
-    #rescue_competence = [float(row[2]) for row in beliefs if row[1] == 'rescue']
-    #rescue_willingness = [float(row[3]) for row in beliefs if row[1] == 'rescue']
+    rescue_competence = [float(row[2]) for row in beliefs if row[1] == 'rescue_red']
+    rescue_willingness = [float(row[3]) for row in beliefs if row[1] == 'rescue_red']
 
     plt.figure(figsize=(10, 5))
     plt.plot(search_competence, marker='o', linestyle='-', label='Search Competence')
