@@ -14,16 +14,23 @@ if __name__ == "__main__":
     choice1=input()
     print("\nEnter a name or id for the human agent:")
     choice2=input()
+    builder = None
     if choice1=='tutorial':
         builder = create_builder(task_type='tutorial',condition='tutorial', name=choice2, folder=fld)
     else:
         print("\nEnter one of the human conditions 'normal', 'strong', or 'weak':")
         choice3=input()
         if choice3=='normal' or choice3=='strong' or choice3=='weak':
-            builder = create_builder(task_type=choice1, condition=choice3, name=choice2, folder=fld)
+            print("\nChoose one of the baselines/algorithm: 'never', 'always', 'random', 'trust':")
+            choice4=input().lower()
+            if choice4 in ['never', 'always', 'random', 'trust']:
+                builder = create_builder(task_type=choice1, condition=choice3, name=choice2, folder=fld, agent_type = choice4)
+            else: print(f"\nWrong algorithm name entered: '{choice4}'")
         else:
             print("\nWrong condition name entered")
-
+    if builder is None:
+        print("\nWrong")
+        sys.exit(1)
     # Start overarching MATRX scripts and threads, such as the api and/or visualizer if requested. Here we also link our own media resource folder with MATRX.
     media_folder = pathlib.Path().resolve()
     builder.startup(media_folder=media_folder)
