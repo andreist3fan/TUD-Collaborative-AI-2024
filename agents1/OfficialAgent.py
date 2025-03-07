@@ -1209,9 +1209,8 @@ class BaselineAgent(ArtificialBrain):
             self._send_message_ticks.append((message, tick_nr))
 
         # we can use the time it takes to do it alone if applicable to be the time to wait/correspond to it
-        response_time_threshold = 100
-        relevant_response_time_threshold_yellow = 100
-        relevant_response_time_threshold_red = 100
+        relevant_response_time_threshold_yellow = 400
+        relevant_response_time_threshold_red = 400
         given_relevant_response_in_time_red = False
         given_relevant_response_in_time_yellow = False
         claimed_saved = []
@@ -1279,6 +1278,8 @@ class BaselineAgent(ArtificialBrain):
                                 self._lookup_table["Mild"][response][
                                     (distance_human, self._tick_distance_goal[send_tick])][
                                     'willingness']
+                            trustBeliefs[self._human_name]['rescue_yellow']['willingness'] += 0.05
+                            trustBeliefs[self._human_name]['rescue_yellow']['competence'] += 0.05
                         else:
                             print('not relevant response for mild to updated yellow values after tome')
                             if resp_tick - send_tick > relevant_response_time_threshold_yellow:
@@ -1309,6 +1310,8 @@ class BaselineAgent(ArtificialBrain):
                             trustBeliefs[self._human_name]['rescue_red']['willingness'] += \
                                 self._lookup_table["Critical"][response][
                                     (distance_human, self._tick_distance_goal[send_tick])]['willingness']
+                            trustBeliefs[self._human_name]['rescue_red']['competence'] += 0.05
+                            trustBeliefs[self._human_name]['rescue_red']['willingness'] += 0.05
                         else:
                             print('not relevant response for critical to updated red values after time')
                             if resp_tick - send_tick > relevant_response_time_threshold_red:
