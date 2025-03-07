@@ -80,8 +80,10 @@ class BaselineAgent(ArtificialBrain):
         self._take_victim_repeat = False
         self._last_length_received_messages = 0
         self._last_length_send_messages = 0
+
         self._found_victim_tick = np.inf
         self._updated_time_carry = False
+        self._max_wait_time = 0
 
 
 
@@ -133,6 +135,12 @@ class BaselineAgent(ArtificialBrain):
         # Filtering of the world state before deciding on an action 
         return state
 
+    def clean_victim_string(self, victim_str):
+        """Cleans up the victim string by removing area info and formatting."""
+        # Remove the "in_area_X" part
+        cleaned = re.sub(r'_in_area_\d+', '', victim_str)
+        # Replace underscores with spaces
+        return cleaned.replace('_', ' ')
     def decide_on_actions(self, state):
         # Identify team members
         agent_name = state[self.agent_id]['obj_id']
@@ -182,10 +190,13 @@ class BaselineAgent(ArtificialBrain):
                 if info['is_carrying'][0]['img_name'][8:-4] not in self._collected_victims:
                     self._collected_victims.append(info['is_carrying'][0]['img_name'][8:-4])
                 self._carrying_together = True
-                time_to_arrive = self._found_victim_tick - state['World']['nr_ticks']
+                time_to_arrive = state['World']['nr_ticks'] - self._found_victim_tick
                 if not self._updated_time_carry:
                     self._updated_time_carry = True
-                    self._send_message('Carrying victim together with human' + info['is_carrying'][0]['obj_id'] + 'after waiting' + str(time_to_arrive), 'RescueBot')
+                    self._send_message('Carrying victim together with human ' +
+                                       self.clean_victim_string(info['is_carrying'][0]['obj_id']) + ' after waiting ' +
+                                       str(time_to_arrive) + ' with max waiting time of ' +
+                                       str(self._max_wait_time), 'RescueBot')
             if 'is_human_agent' in info and self._human_name in info['name'] and len(info['is_carrying']) == 0:
                 self._carrying_together = False
                 self._updated_time_carry = False
@@ -706,7 +717,7 @@ class BaselineAgent(ArtificialBrain):
                                         afstand - distance between us: ' + self._distance_human, 'RescueBot')
                                     self.robot_found = True
                                     self._waiting = True
-                                self._found_victim_tick = state['World']['nr_ticks']
+
                                     # Execute move actions to explore the area
                     return action, {}
 
@@ -743,6 +754,12 @@ class BaselineAgent(ArtificialBrain):
                                 self._recent_vic) + ' together.', 'RescueBot')
                             self.robot_found = True
                             self._found_victim_tick = state['World']['nr_ticks']
+                            willingness_to_rescue_trust = (
+                                        0.75 * trustBeliefs[self._human_name]['rescue_red']['willingness']
+                                        + 0.25 * trustBeliefs[self._human_name]['rescue_red']['competence'])
+                            self._max_wait_time = self.compute_wait_time_robot_calls_human(willingness_to_rescue_trust)
+                            self._send_message('I will wait for you to pick up critical victim for ' + str(self._max_wait_time/10) + ' seconds',
+                                               'RescueBot')
 
                         # Tell the human to carry the critically injured victim together
                         if state[{'is_human_agent': True}]:
@@ -781,7 +798,15 @@ class BaselineAgent(ArtificialBrain):
                             self._send_message('Please come to ' + str(self._door['room_name']) + ' to carry ' + str(
                                 self._recent_vic) + ' together.', 'RescueBot')
                             self._found_victim_tick = state['World']['nr_ticks']
+                            willingness_to_rescue_trust = (
+                                    0.75 * trustBeliefs[self._human_name]['rescue_yellow']['willingness']
+                                    + 0.25 * trustBeliefs[self._human_name]['rescue_yellow']['competence'])
+                            self._max_wait_time = self.compute_wait_time_robot_calls_human(willingness_to_rescue_trust)
+                            self._send_message('I will wait for you to pick up the victim for ' + str(
+                                self._max_wait_time / 10) + ' seconds',
+                                               'RescueBot')
                         # Tell the human to carry the mildly injured victim together
+
                         #TODO: update trust positive based on this message
                         if state[{'is_human_agent': True}]:
                             self._send_message('Lets carry ' + str(
@@ -908,11 +933,13 @@ class BaselineAgent(ArtificialBrain):
                         if self.robot_found:
 
                             if self._human_name not in info['name']:
-                                if state['World']['nr_ticks'] - self._found_victim_tick > 500:
+                                if state['World']['nr_ticks'] - self._found_victim_tick > self._max_wait_time:
                                     self._found_victim_tick = np.inf
                                     # self._answered = True
                                     self._waiting = False
-                                    self._send_message('Human did not come in time for victim, moving on', 'RescueBot')
+                                    msg = 'Human did not come in time for critical victim, moving on' if 'critical' in info['obj_id']\
+                                        else 'Human did not come in time for mild victim, moving on'
+                                    self._send_message(msg, 'RescueBot')
                                     self._todo.append(self._goal_vic)
                                     self._goal_vic = None
                                     self._recent_vic = None
@@ -1044,11 +1071,7 @@ class BaselineAgent(ArtificialBrain):
         trust_state = np.random.choice([True, False], p=[prob_trust, 1 - prob_trust])
         return trust_state
 
-    def compute_wait_time_robot_calls_human(self, trust_value, min_ticks=150, max_ticks=400):
-        """Maps trust value (-1 to 1) to wait time in ticks (200 to 400)."""
-        return int(min_ticks + (trust_value + 1) * (max_ticks - min_ticks) / 2)
-
-    def compute_wait_time_human_called_robot_but_not_present_at_arrival(self, trust_value, min_ticks=100, max_ticks=300):
+    def compute_wait_time_robot_calls_human(self, trust_value, min_ticks=450, max_ticks=900):
         """Maps trust value (-1 to 1) to wait time in ticks (200 to 400)."""
         return int(min_ticks + (trust_value + 1) * (max_ticks - min_ticks) / 2)
 
@@ -1259,7 +1282,7 @@ class BaselineAgent(ArtificialBrain):
         received_index = 0
         for i in range(0, len(self._current_tick_received_messages) + len(self._send_message_ticks)):
             if i < len(self._send_message_ticks):
-                msg = self._send_message_ticks[i][0];
+                msg = self._send_message_ticks[i][0]
                 if 'Human agent not present at location to save mild victim together' == msg:
                     # print("Gave up on task")
                     trustBeliefs[self._human_name]['rescue_yellow']['willingness'] -= 0.2
@@ -1272,7 +1295,46 @@ class BaselineAgent(ArtificialBrain):
                     # print("Did not follow sequence of tasks")
                     trustBeliefs[self._human_name]['rescue_yellow']['competence'] -= 0.05
                     trustBeliefs[self._human_name]['rescue_yellow']['willingness'] += 0.1
+                elif msg.startswith('Carrying'):
+                    match = re.findall(r'waiting (\d+) with max waiting time of (\d+)', msg)
+                    waiting_time = 0
+                    max_waiting_time = 0
+                    if match:
+                        waiting_time, max_waiting_time = map(int, match[0])
+                    interval = max_waiting_time / 3
+                    mid = interval*2
 
+                    if 'mild' in msg:
+                        if waiting_time <= interval:
+                            trustBeliefs[self._human_name]['rescue_yellow']['competence'] += 0.3
+                            trustBeliefs[self._human_name]['rescue_yellow']['willingness'] += 0.3
+                        elif interval < waiting_time <= mid:
+                            trustBeliefs[self._human_name]['rescue_yellow']['competence'] += 0.1
+                            trustBeliefs[self._human_name]['rescue_yellow']['willingness'] += 0.1
+                        else:
+                            if waiting_time <= interval:
+                                trustBeliefs[self._human_name]['rescue_yellow']['competence'] -= 0.1
+                                trustBeliefs[self._human_name]['rescue_yellow']['willingness'] -= 0.1
+
+                    if 'critical' in msg:
+                        if waiting_time <= interval:
+                            trustBeliefs[self._human_name]['rescue_red']['competence'] += 0.3
+                            trustBeliefs[self._human_name]['rescue_red']['willingness'] += 0.3
+                        elif interval < waiting_time <= mid:
+                            trustBeliefs[self._human_name]['rescue_red']['competence'] += 0.1
+                            trustBeliefs[self._human_name]['rescue_red']['willingness'] += 0.1
+                        else:
+                            if waiting_time <= interval:
+                                trustBeliefs[self._human_name]['rescue_red']['competence'] -= 0.1
+                                trustBeliefs[self._human_name]['rescue_red']['willingness'] -= 0.1
+
+                elif 'Human did not' in msg:
+                    if 'mild' in msg:
+                        trustBeliefs[self._human_name]['rescue_yellow']['competence'] -= 0.2
+                        trustBeliefs[self._human_name]['rescue_yellow']['willingness'] -= 0.2
+                    else:
+                        trustBeliefs[self._human_name]['rescue_red']['willingness'] -= 0.2
+                        trustBeliefs[self._human_name]['rescue_red']['competence'] -= 0.2
 
             if send_index == len(self._send_message_ticks):
                 cur_message = self._current_tick_received_messages[received_index][0]
