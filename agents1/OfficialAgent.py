@@ -86,13 +86,13 @@ class BaselineAgent(ArtificialBrain):
         self._lookup_table = {
             "Mild": {
                 "Rescue together": {
-                    ("close", "close"): {"competence": 0.05, "willingness": 0.1},
-                    ("close", "far"): {"competence": 0.15, "willingness": 0.1},
-                    ("far", "close"): {"competence": -0.1, "willingness": 0.15},
+                    ("close", "close"): {"competence": 0.1, "willingness": 0.1},
+                    ("close", "far"): {"competence": 0.2, "willingness": 0.1},
+                    ("far", "close"): {"competence": -0.05, "willingness": 0.15},
                     ("far", "far"): {"competence": 0.1, "willingness": 0.15},
                 },
                 "Rescue alone": {
-                    ("close", "close"): {"competence": 0.05, "willingness": -0.15},
+                    ("close", "close"): {"competence": 0.1, "willingness": -0.15},
                     ("close", "far"): {"competence": -0.1, "willingness": -0.15},
                     ("far", "close"): {"competence": 0.2, "willingness": -0.1},
                     ("far", "far"): {"competence": 0.1, "willingness": -0.1},
@@ -110,11 +110,11 @@ class BaselineAgent(ArtificialBrain):
                     ("close", "close"): {"competence": 0.15, "willingness": 0.1},
                     ("close", "far"): {"competence": 0.2, "willingness": 0.1},
                     ("far", "close"): {"competence": 0.1, "willingness": 0.15},
-                    ("far", "far"): {"competence": 0.1, "willingness": 0.15},
+                    ("far", "far"): {"competence": 0.15, "willingness": 0.15},
                 },
                 "Continue": {  # For "Continue" in critical cases
-                    ("close", "close"): {"competence": -0.15, "willingness": -0.2},
-                    ("close", "far"): {"competence": -0.2, "willingness": -0.2},
+                    ("close", "close"): {"competence": -0.15, "willingness": -0.15},
+                    ("close", "far"): {"competence": -0.2, "willingness": -0.15},
                     ("far", "close"): {"competence": -0.1, "willingness": -0.1},
                     ("far", "far"): {"competence": -0.1, "willingness": -0.1},
                 },
@@ -224,9 +224,13 @@ class BaselineAgent(ArtificialBrain):
                 if remaining_zones:
                     self._remainingZones = remaining_zones
                     self._remaining = remaining
+                    # if self._collected_victims == 8:
+                    #     self._send_message('There are still free zones, but all victims should have been collected based on your messages', 'RescueBot')
                 # Remain idle if there are no victims left to rescue
+
                 if not remaining_zones:
                     return None, {}
+
 
                 # Check which victims can be rescued next because human or agent already found them
                 for vic in remaining_vics:
@@ -1216,14 +1220,17 @@ class BaselineAgent(ArtificialBrain):
             if i < len(self._send_message_ticks):
                 msg = self._send_message_ticks[i][0];
                 if 'Human agent not present at location to save mild victim together' == msg:
+                    print("Gave up on task")
                     trustBeliefs[self._human_name]['rescue_yellow']['willingness'] -= 0.2
                     trustBeliefs[self._human_name]['rescue_yellow']['competence'] -= 0.2
                 elif 'Human agent not present at location to save critical victim together' == msg:
+                    print("Gave up on critical task")
                     trustBeliefs[self._human_name]['rescue_red']['willingness'] -= 0.2
                     trustBeliefs[self._human_name]['rescue_red']['competence'] -= 0.2
                 elif 'Victim was not communicated as found' in msg:
+                    print("Did not follow sequence of tasks")
                     trustBeliefs[self._human_name]['rescue_yellow']['competence'] -= 0.05
-                    trustBeliefs[self._human_name]['rescue_yellow']['willingness'] += 0.05
+                    trustBeliefs[self._human_name]['rescue_yellow']['willingness'] += 0.1
 
 
             if send_index == len(self._send_message_ticks):
@@ -1261,6 +1268,7 @@ class BaselineAgent(ArtificialBrain):
 
                         if response in self._lookup_table['Mild'].keys():
                             given_relevant_response_in_time_yellow = True
+                            print('relevant response for mild to updated yellow values')
                             trustBeliefs[self._human_name]['rescue_yellow']['competence'] += \
                                 self._lookup_table["Mild"][response][
                                     (distance_human, self._tick_distance_goal[send_tick])][
@@ -1270,13 +1278,14 @@ class BaselineAgent(ArtificialBrain):
                                     (distance_human, self._tick_distance_goal[send_tick])][
                                     'willingness']
                         else:
+                            print('not relevant response for mild to updated yellow values after tome')
                             if resp_tick - send_tick > relevant_response_time_threshold_yellow:
                                 trustBeliefs[self._human_name]['rescue_yellow']['willingness'] -= 0.1
                                 trustBeliefs[self._human_name]['rescue_yellow']['competence'] -= 0.1
 
                 elif 'Found critical' in send_message:
                     if not given_relevant_response_in_time_red:
-                        given_relevant_response_in_time_red = True
+
                         victims_match = re.search(r'safe - victims rescued: \[(.*?)\]', send_message)
                         victims = victims_match.group(1).split(", ") if victims_match else []
 
@@ -1290,6 +1299,8 @@ class BaselineAgent(ArtificialBrain):
                             trustBeliefs[self._human_name]['rescue_red']['willingness'] -= 0.1
 
                         if response in self._lookup_table['Critical'].keys():
+                            print('relevant response for critical to updated red values')
+                            given_relevant_response_in_time_red = True
                             trustBeliefs[self._human_name]['rescue_red']['competence'] += \
                                 self._lookup_table["Critical"][response][
                                     (distance_human, self._tick_distance_goal[send_tick])]['competence']
@@ -1297,6 +1308,7 @@ class BaselineAgent(ArtificialBrain):
                                 self._lookup_table["Critical"][response][
                                     (distance_human, self._tick_distance_goal[send_tick])]['willingness']
                         else:
+                            print('not relevant response for critical to updated red values after time')
                             if resp_tick - send_tick > relevant_response_time_threshold_red:
                                 trustBeliefs[self._human_name]['rescue_red']['competence'] -= 0.1
                                 trustBeliefs[self._human_name]['rescue_red']['willingness'] -= 0.1
@@ -1308,10 +1320,12 @@ class BaselineAgent(ArtificialBrain):
                 collected_victim = False
                 for i in range(0, next_message_length):
                     if 'Collect' in next_received_messages[i]:
+                        print('collect in response threshold')
                         collected_victim = True
                         trustBeliefs[self._human_name]['rescue_red']['competence'] += 0.1
                         trustBeliefs[self._human_name]['rescue_red']['willingness'] += 0.1
                 if not collected_victim:
+                    print('not collect in response threshold')
                     trustBeliefs[self._human_name]['rescue_red']['competence'] -= 0.1
                     trustBeliefs[self._human_name]['rescue_red']['willingness'] -= 0.1
 
