@@ -35,7 +35,7 @@ class Phase(enum.Enum):
 
 
 class BaselineAgent(ArtificialBrain):
-    def __init__(self, slowdown, condition, name, folder):
+    def __init__(self, slowdown, condition, name, folder, agent_type):
         super().__init__(slowdown, condition, name, folder)
         # Initialization of some relevant variables
         self._current_tick_received_messages = []
@@ -74,8 +74,6 @@ class BaselineAgent(ArtificialBrain):
         self._recent_vic = None
         self._received_messages = []
         self._moving = False
-
-        self._default_trust_value = 0
         self.robot_found = False
         # avoid loops and unnecessary checks in phase.take_victim
         self._take_victim_repeat = False
@@ -84,7 +82,7 @@ class BaselineAgent(ArtificialBrain):
 
         # Define the type of trust values the agent has
         # You can choose from 'Trust_Belief', 'Never_Trust', 'Always_Trust', 'Random_Trust'
-        self.type = 'Trust_Belief'
+        self.type = agent_type
 
         self._lookup_table = {
             "Mild": {
@@ -125,10 +123,10 @@ class BaselineAgent(ArtificialBrain):
         }
     def _default_trust_value(self):
         default_trust_type = {
-            'Trust_Belief': 0,
-            'Never_Trust': -1,
-            'Always_Trust': 1,
-            'Random_Trust': random.uniform(-1, 1)
+            'trust': 0,
+            'never': -1,
+            'always': 1,
+            'random': random.uniform(-1, 1)
         }
         return default_trust_type[self.type]
 
@@ -1182,13 +1180,18 @@ class BaselineAgent(ArtificialBrain):
             if self._human_name not in trustBeliefs:
                 trustBeliefs[self._human_name] = {}
 
-                competence = self._default_trust_value()
-                willingness = self._default_trust_value()
-                trustBeliefs[self._human_name]['search'] = {'competence': competence, 'willingness': willingness}
-                trustBeliefs[self._human_name]['rescue_red'] = {'competence': competence,
-                                                                'willingness': willingness}
-                trustBeliefs[self._human_name]['rescue_yellow'] = {'competence': competence,
-                                                                   'willingness': willingness}
+                s_competence = self._default_trust_value()
+                s_willingness = self._default_trust_value()
+                r_r_competence = self._default_trust_value()
+                r_r_willingness = self._default_trust_value()
+                r_y_competence = self._default_trust_value()
+                r_y_willingness = self._default_trust_value()
+
+                trustBeliefs[self._human_name]['search'] = {'competence': s_competence, 'willingness': s_willingness}
+                trustBeliefs[self._human_name]['rescue_red'] = {'competence': r_r_competence,
+                                                                'willingness': r_r_willingness}
+                trustBeliefs[self._human_name]['rescue_yellow'] = {'competence': r_y_competence,
+                                                                   'willingness': r_y_willingness}
         return trustBeliefs
 
     def _trustBelief(self, members, trustBeliefs, folder, receivedMessages):
@@ -1197,7 +1200,7 @@ class BaselineAgent(ArtificialBrain):
         '''
 
         # Update the trust belief only if it's not one of the baselines
-        if self.type == 'TrustBelief':
+        if self.type == 'trust':
 
           # for some reason values for the trust for rescue are not updated properly for red
           # and I think for yellow, they drop to -1 really fast for some reason, need to look into that
