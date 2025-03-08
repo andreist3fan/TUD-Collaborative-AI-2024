@@ -82,6 +82,11 @@ class BaselineAgent(ArtificialBrain):
         self._found_victim_tick = np.inf
         self._updated_time_carry = False
         self._max_wait_time = 0
+        self._print_time_waited = False
+        self._coming_from_victim_log = False
+        self._supposed_collected_to_room = {}
+        self._coming_from_carry = False
+        self._entered_already = 0
 
         # Define the type of trust values the agent has
         # You can choose from 'Trust_Belief', 'Never_Trust', 'Always_Trust', 'Random_Trust'
@@ -199,12 +204,13 @@ class BaselineAgent(ArtificialBrain):
                     self._collected_victims.append(info['is_carrying'][0]['img_name'][8:-4])
                 self._carrying_together = True
                 time_to_arrive = state['World']['nr_ticks'] - self._found_victim_tick
-                if not self._updated_time_carry:
+                if not self._updated_time_carry and self._max_wait_time != np.inf and time_to_arrive != -np.inf and self._print_time_waited:
                     self._updated_time_carry = True
                     self._send_message('Carrying victim together with human ' +
                                        self.clean_victim_string(info['is_carrying'][0]['obj_id']) + ' after waiting ' +
                                        str(time_to_arrive) + ' with max waiting time of ' +
                                        str(self._max_wait_time), 'RescueBot')
+                    self._print_time_waited = False
             if 'is_human_agent' in info and self._human_name in info['name'] and len(info['is_carrying']) == 0:
                 self._carrying_together = False
                 self._updated_time_carry = False
@@ -269,13 +275,17 @@ class BaselineAgent(ArtificialBrain):
                         self._send_message('Moving to ' + self._found_victim_logs[vic][
                             'room'] + ' to pick up ' + self._goal_vic + '. Please come there as well to help me carry ' + self._goal_vic + ' to the drop zone.',
                                           'RescueBot')
+                        self._coming_from_victim_log = True
                         # Plan path to victim because the exact location is known (i.e., the agent found this victim)
                         if 'location' in self._found_victim_logs[vic].keys():
                             self.robot_found = True
+                            self._coming_from_carry = False
                             self._phase = Phase.PLAN_PATH_TO_VICTIM
                             return Idle.__name__, {'duration_in_ticks': 25}
                         # Plan path to area because the exact victim location is not known, only the area (i.e., human found this  victim)
                         if 'location' not in self._found_victim_logs[vic].keys():
+                            self.robot_found = False
+                            self._coming_from_carry = False
                             self._phase = Phase.PLAN_PATH_TO_ROOM
                             return Idle.__name__, {'duration_in_ticks': 25}
                     # Define a previously found victim as target victim
@@ -291,10 +301,15 @@ class BaselineAgent(ArtificialBrain):
                         # Plan path to victim because the exact location is known (i.e., the agent found this victim)
                         if 'location' in self._found_victim_logs[vic].keys():
                             self.robot_found = True
+                            self._coming_from_victim_log = True
+                            self._coming_from_carry = False
                             self._phase = Phase.PLAN_PATH_TO_VICTIM
                             return Idle.__name__, {'duration_in_ticks': 25}
                         # Plan path to area because the exact victim location is not known, only the area (i.e., human found this  victim)
                         if 'location' not in self._found_victim_logs[vic].keys():
+                            self.robot_found = False
+                            self._coming_from_victim_log = False
+                            self._coming_from_carry = False
                             self._phase = Phase.PLAN_PATH_TO_ROOM
                             return Idle.__name__, {'duration_in_ticks': 25}
                     # If there are no target victims found, visit an unsearched area to search for victims
@@ -768,6 +783,8 @@ class BaselineAgent(ArtificialBrain):
                             self._max_wait_time = self.compute_wait_time_robot_calls_human(willingness_to_rescue_trust)
                             self._send_message('I will wait for you to pick up critical victim for ' + str(self._max_wait_time/10) + ' seconds',
                                                'RescueBot')
+                            self._print_time_waited = True
+                            self._coming_from_carry = False
 
                         # Tell the human to carry the critically injured victim together
                         if state[{'is_human_agent': True}]:
@@ -775,9 +792,12 @@ class BaselineAgent(ArtificialBrain):
                             self._send_message('Lets carry ' + str(
                                 self._recent_vic) + ' together! Please wait until I moved on top of ' + str(
                                 self._recent_vic) + '.', 'RescueBot')
+                            self._coming_from_carry = True
+
+                        self.robot_found = True
                         self._goal_vic = self._recent_vic
                         self._recent_vic = None
-                        self.robot_found = True
+                        self._coming_from_victim_log = False
                         print("I am here now cause I trust and should be in the case where robot found:")
                         self._phase = Phase.PLAN_PATH_TO_VICTIM
                     else:
@@ -797,6 +817,7 @@ class BaselineAgent(ArtificialBrain):
                     combined_trust = (0.7 * trustBeliefs[self._human_name]['rescue_yellow']['willingness']
                                       + 0.3 * trustBeliefs[self._human_name]['rescue_yellow']['competence'])
                     trusting = self.probability_trust(combined_trust)
+                    print('here')
                     if trusting:
                         self._rescue = 'together'
                         self._answered = True
@@ -813,6 +834,9 @@ class BaselineAgent(ArtificialBrain):
                             self._send_message('I will wait for you to pick up the victim for ' + str(
                                 self._max_wait_time / 10) + ' seconds',
                                                'RescueBot')
+                            self._print_time_waited = True
+                            self._coming_from_carry = False
+
                         # Tell the human to carry the mildly injured victim together
 
                         #TODO: update trust positive based on this message
@@ -820,9 +844,12 @@ class BaselineAgent(ArtificialBrain):
                             self._send_message('Lets carry ' + str(
                                 self._recent_vic) + ' together! Please wait until I moved on top of ' + str(
                                 self._recent_vic) + '.', 'RescueBot')
+                            self._coming_from_carry = True
+
                         self._goal_vic = self._recent_vic
                         self._recent_vic = None
                         self.robot_found = True
+                        self._coming_from_victim_log = False
                         self._phase = Phase.PLAN_PATH_TO_VICTIM
                     else:
                         # We decide to save the victim ourselves
@@ -833,6 +860,9 @@ class BaselineAgent(ArtificialBrain):
                         self._goal_loc = self._remaining[self._goal_vic]
                         self._recent_vic = None
                         self.robot_found = True
+                        self._take_victim_repeat = True
+                        self._coming_from_victim_log = False
+                        self._coming_from_carry = False
                         self._phase = Phase.PLAN_PATH_TO_VICTIM
 
                 # Make a plan to rescue the mildly injured victim alone if the human decides so, and communicate this to the human
@@ -849,6 +879,8 @@ class BaselineAgent(ArtificialBrain):
                     self._goal_loc = self._remaining[self._goal_vic]
                     self._recent_vic = None
                     self.robot_found = True
+                    self._coming_from_victim_log = False
+                    self._coming_from_carry = False
                     self._phase = Phase.PLAN_PATH_TO_VICTIM
                 # Continue searching other areas if the human decides so
                 if self.received_messages_content and self.received_messages_content[-1] == 'Continue':
@@ -870,6 +902,8 @@ class BaselineAgent(ArtificialBrain):
                         self._send_message("Low current trust level; Picking up: " + self._goal_vic, "RescueBot")
                         self._goal_loc = self._remaining[self._goal_vic]
                         self._recent_vic = None
+                        self._coming_from_victim_log = False
+                        self._coming_from_carry = False
                         self._take_victim_repeat = True # used to enter or ignore the if statement in take victim phase manually
                         self._phase = Phase.PLAN_PATH_TO_VICTIM
 
@@ -884,6 +918,7 @@ class BaselineAgent(ArtificialBrain):
                 return Idle.__name__, {'duration_in_ticks': 25}
 
             if Phase.PLAN_PATH_TO_VICTIM == self._phase:
+                print('entered path to victim')
                 # Plan the path to a found victim using its location
                 self._navigator.reset_full()
                 self._navigator.add_waypoints([self._found_victim_logs[self._goal_vic]['location']])
@@ -916,10 +951,9 @@ class BaselineAgent(ArtificialBrain):
                               and info['room_name'] == self._found_victim_logs[self._goal_vic]['room']]
                 self._roomtiles = room_tiles
                 objects = []
-
-
                 # TODO: Here we need to incorporate the time to wait for human to come to and if he is there when we come
                 # When the victim has to be carried by human and agent together, check whether human has arrived at the victim's location
+                counter = 0
                 for info in state.values():
 
                     # When the victim has to be carried by human and agent together, check whether human has arrived at the victim's location
@@ -936,87 +970,97 @@ class BaselineAgent(ArtificialBrain):
                         'class_inheritance'] and 'mild' in info['obj_id'] and info['location'] in self._roomtiles:
 
                         objects.append(info)
-
                         # check if the robot found the victim, meaning we are waiting for the person to come
-                        if self.robot_found:
-
-                            if self._human_name not in info['name']:
-                                if state['World']['nr_ticks'] - self._found_victim_tick > self._max_wait_time:
-                                    self._found_victim_tick = np.inf
-                                    # self._answered = True
-                                    self._waiting = False
-                                    msg = 'Human did not come in time for critical victim, moving on' if 'critical' in info['obj_id']\
-                                        else 'Human did not come in time for mild victim, moving on'
-                                    self._send_message(msg, 'RescueBot')
-                                    self._todo.append(self._goal_vic)
-                                    self._goal_vic = None
-                                    self._recent_vic = None
-                                    self._phase = Phase.FIND_NEXT_GOAL
-                                    return None, {}
-                                else:
-                                    print('waiting')
-                                    print(state['World']['nr_ticks'] - self._found_victim_tick)
-                                    self._waiting = True
-                                    self._moving = False
-                                    return None, {}
-
-
-                                # Remain idle when the human has not arrived at the location
-                                # if we call the human, we are willing to wait a certain amount of time based on trust
-                                # self._waiting = True
-                                # self._moving = False
-                                # return None, {}
-                        #if the person called us, then we need to check if he is there when we arrive
-                        else:
-                            if self._human_name not in info['name'] and not self._take_victim_repeat:
-                                # TODO: time it takes for human to arrive if we have called him, this needs more testing
-                                #  for loops and normal performance
-
-                                #we determine the trust to use and the message to send when human not present at location
-
-                                if 'mild' in info['obj_id']:
-                                    combined_trust = (0.5 * trustBeliefs[self._human_name]['rescue_yellow']['willingness']
-                                                      + 0.5 * trustBeliefs[self._human_name]['rescue_yellow']['competence'])
-                                    we_trust = self.probability_trust(combined_trust)
-                                    self._send_message('Human agent not present at location to save mild victim together', "RescueBot")
-                                else:
-                                    combined_trust = (0.5 * trustBeliefs[self._human_name]['rescue_red']['willingness']
-                                                      + 0.5 * trustBeliefs[self._human_name]['rescue_red']['competence'])
-                                    we_trust = self.probability_trust(combined_trust)
-                                    self._send_message('Human agent not present at location to save critical victim together', "RescueBot")
-
-                                if we_trust:
-                                    self._waiting = True
-                                    self._moving = False
-                                    self._send_message("Waiting for human to come pick up victim together",
-                                                       "RescueBot")
-                                    return None, {}
-
-                                else:
-                                    if 'mild' in info['obj_id']:
-                                        self._answered = True
+                        if not self._coming_from_carry and not self._coming_from_victim_log:
+                            if self.robot_found:
+                                print('robot found')
+                                if self._human_name not in info['name']:
+                                    print('Here?')
+                                    if state['World']['nr_ticks'] - self._found_victim_tick > self._max_wait_time:
+                                        self._found_victim_tick = np.inf
+                                        self._max_wait_time = np.inf
+                                        # self._answered = True
                                         self._waiting = False
-                                        self._goal_vic = ' '.join(info['obj_id'].split('_')[:3])
-                                        self._send_message("Human not present will not wait; Picking up: " + self._goal_vic,
-                                                           "RescueBot")
-                                        self._goal_loc = self._remaining[self._goal_vic]
+                                        msg = 'Human did not come in time for critical victim, moving on' if 'critical' in info['obj_id']\
+                                            else 'Human did not come in time for mild victim, moving on'
+                                        self._send_message(msg, 'RescueBot')
+                                        self._todo.append(self._goal_vic)
+                                        self._goal_vic = None
                                         self._recent_vic = None
-                                        self._phase = Phase.PLAN_PATH_TO_VICTIM
-                                        self._take_victim_repeat = True
+                                        self._phase = Phase.FIND_NEXT_GOAL
+                                        return None, {}
+                                    else:
+                                        print('waiting')
+                                        print(state['World']['nr_ticks'] - self._found_victim_tick)
+                                        self._waiting = True
+                                        self._moving = False
+                                        return None, {}
+
+
+                                    # Remain idle when the human has not arrived at the location
+                                    # if we call the human, we are willing to wait a certain amount of time based on trust
+                                    # self._waiting = True
+                                    # self._moving = False
+                                    # return None, {}
+                            #if the person called us, then we need to check if he is there when we arrive
+                            else:
+                                if self._human_name not in info['name'] and not self._take_victim_repeat and not self._coming_from_victim_log and not self._coming_from_carry:
+                                    # TODO: time it takes for human to arrive if we have called him, this needs more testing
+                                    #  for loops and normal performance
+
+                                    #we determine the trust to use and the message to send when human not present at location
+
+                                    if 'mild' in info['obj_id']:
+                                        combined_trust = (0.5 * trustBeliefs[self._human_name]['rescue_yellow']['willingness']
+                                                          + 0.5 * trustBeliefs[self._human_name]['rescue_yellow']['competence'])
+                                        we_trust = self.probability_trust(combined_trust)
+                                        self._send_message('Human agent not present at location to save mild victim together', "RescueBot")
+                                    else:
+                                        combined_trust = (0.5 * trustBeliefs[self._human_name]['rescue_red']['willingness']
+                                                          + 0.5 * trustBeliefs[self._human_name]['rescue_red']['competence'])
+                                        we_trust = self.probability_trust(combined_trust)
+                                        self._send_message('Human agent not present at location to save critical victim together', "RescueBot")
+
+                                    if we_trust:
+                                        self._waiting = True
+                                        self._moving = False
+                                        self._send_message("Waiting for human to come pick up victim together",
+                                                           "RescueBot")
+                                        return None, {}
 
                                     else:
-                                        self._take_victim_repeat = False
-                                        self._waiting = False
-                                        self._recent_vic = None
-                                        self._goal_vic = None
-                                        self._phase = Phase.PICK_UNSEARCHED_ROOM
-                                        self._send_message("Human not present will not wait; Proceeding to next goal",
-                                                           "RescueBot")
-                self.robot_found = False
+                                        if 'mild' in info['obj_id']:
+                                            self._answered = True
+                                            self._waiting = False
+                                            self._goal_vic = ' '.join(info['obj_id'].split('_')[:3])
+                                            self._send_message("Human not present will not wait; Picking up: " + self._goal_vic,
+                                                               "RescueBot")
+                                            self._goal_loc = self._remaining[self._goal_vic]
+                                            self._recent_vic = None
+                                            self._coming_from_victim_log = False
+                                            self._coming_from_carry = False
+                                            self._phase = Phase.PLAN_PATH_TO_VICTIM
+                                            self._take_victim_repeat = True
+
+                                        else:
+                                            self._take_victim_repeat = False
+                                            self._waiting = False
+                                            self._recent_vic = None
+                                            self._goal_vic = None
+                                            self._phase = Phase.PICK_UNSEARCHED_ROOM
+                                            self._send_message("Human not present will not wait; Proceeding to next goal",
+                                                               "RescueBot")
+                                            # Remain idle when the human has not arrived at the location
+                        if not self._human_name in info['name']:
+                            self._waiting = True
+                            self._moving = False
+                            return None, {}
+        # self.robot_found = False
 
                 if self._take_victim_repeat:
                     self._rescue = 'alone'
                 self._take_victim_repeat = False
+
 
 
                 # Add the victim to the list of rescued victims when it has been picked up
@@ -1158,22 +1202,31 @@ class BaselineAgent(ArtificialBrain):
                     else:
                         collectVic = ' '.join(msg.split()[1:5])
                     loc = 'area ' + msg.split()[-1]
+                    combined_trust = (0.8 * trustBeliefs[self._human_name]['rescue_yellow']['willingness'] +
+                                      0.2 * trustBeliefs[self._human_name]['rescue_yellow']['competence'])
+
+                    self._supposed_collected_to_room[collectVic] = loc
                     # Add the area to the memory of searched areas
                     if loc not in self._searched_rooms:
                         #this does not work due to the threshold for trusting in search
                         # self._send_message("Victim was not communicated as found", "RescueBot")
-                        self._searched_rooms.add(loc)
+
+                        if combined_trust > 0.5:
+                            self._searched_rooms.add(loc)
                     # Add the victim and location to the memory of found victims
                     if collectVic not in self._found_victims:
                         #this does not work due to the threshold for trusting in search
                         # self._send_message("Victim was not communicated as found", "RescueBot")
-                        self._found_victims.append(collectVic)
-                        self._found_victim_logs[collectVic] = {'room': loc}
+                        if combined_trust > 0.5:
+                            self._found_victims.append(collectVic)
+                            self._found_victim_logs[collectVic] = {'room': loc}
                     if collectVic in self._found_victims and self._found_victim_logs[collectVic]['room'] != loc:
-                        self._found_victim_logs[collectVic] = {'room': loc}
+                        if combined_trust > 0.5:
+                            self._found_victim_logs[collectVic] = {'room': loc}
                     # Add the victim to the memory of rescued victims when the human's condition is not weak
                     if condition != 'weak' and collectVic not in self._collected_victims:
-                        self._collected_victims.append(collectVic)
+                        if combined_trust > 0.5:
+                            self._collected_victims.append(collectVic)
                     # Decide to help the human carry the victim together when the human's condition is weak
                     if condition == 'weak':
                         self._rescue = 'together'
@@ -1319,7 +1372,6 @@ class BaselineAgent(ArtificialBrain):
                           waiting_time, max_waiting_time = map(int, match[0])
                       interval = max_waiting_time / 3
                       mid = interval*2
-
                       if 'mild' in msg:
                           if waiting_time <= interval:
                               trustBeliefs[self._human_name]['rescue_yellow']['competence'] += 0.3
@@ -1327,10 +1379,9 @@ class BaselineAgent(ArtificialBrain):
                           elif interval < waiting_time <= mid:
                               trustBeliefs[self._human_name]['rescue_yellow']['competence'] += 0.1
                               trustBeliefs[self._human_name]['rescue_yellow']['willingness'] += 0.1
-                          else:
-                              if waiting_time <= interval:
-                                  trustBeliefs[self._human_name]['rescue_yellow']['competence'] -= 0.1
-                                  trustBeliefs[self._human_name]['rescue_yellow']['willingness'] -= 0.1
+                          elif mid < waiting_time <= max_waiting_time+1:
+                              trustBeliefs[self._human_name]['rescue_yellow']['competence'] -= 0.1
+                              trustBeliefs[self._human_name]['rescue_yellow']['willingness'] -= 0.1
 
                       if 'critical' in msg:
                           if waiting_time <= interval:
@@ -1339,10 +1390,9 @@ class BaselineAgent(ArtificialBrain):
                           elif interval < waiting_time <= mid:
                               trustBeliefs[self._human_name]['rescue_red']['competence'] += 0.1
                               trustBeliefs[self._human_name]['rescue_red']['willingness'] += 0.1
-                          else:
-                              if waiting_time <= interval:
-                                  trustBeliefs[self._human_name]['rescue_red']['competence'] -= 0.1
-                                  trustBeliefs[self._human_name]['rescue_red']['willingness'] -= 0.1
+                          elif mid < waiting_time <= max_waiting_time+1:
+                              trustBeliefs[self._human_name]['rescue_red']['competence'] -= 0.1
+                              trustBeliefs[self._human_name]['rescue_red']['willingness'] -= 0.1
 
                   elif 'Human did not' in msg:
                       if 'mild' in msg:
@@ -1351,6 +1401,14 @@ class BaselineAgent(ArtificialBrain):
                       else:
                           trustBeliefs[self._human_name]['rescue_red']['willingness'] -= 0.2
                           trustBeliefs[self._human_name]['rescue_red']['competence'] -= 0.2
+
+                  elif msg.startswith('Lets carry') and 'Please wait until I moved on top of' in msg:
+                      if 'mild' in msg:
+                          trustBeliefs[self._human_name]['rescue_yellow']['competence'] += 0.25
+                          trustBeliefs[self._human_name]['rescue_yellow']['willingness'] += 0.25
+                      else:
+                          trustBeliefs[self._human_name]['rescue_red']['willingness'] += 0.25
+                          trustBeliefs[self._human_name]['rescue_red']['competence'] += 0.25
 
               if send_index == len(self._send_message_ticks):
                   cur_message = self._current_tick_received_messages[received_index][0]
