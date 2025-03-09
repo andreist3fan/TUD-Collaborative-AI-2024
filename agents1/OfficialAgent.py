@@ -92,6 +92,7 @@ class BaselineAgent(ArtificialBrain):
         # You can choose from 'Trust_Belief', 'Never_Trust', 'Always_Trust', 'Random_Trust'
         self.type = agent_type
 
+        #look up table for how to update trust when robot found victim
         self._lookup_table = {
             "Mild": {
                 "Rescue together": {
@@ -206,6 +207,8 @@ class BaselineAgent(ArtificialBrain):
                     self._collected_victims.append(info['is_carrying'][0]['img_name'][8:-4])
                 self._carrying_together = True
                 time_to_arrive = state['World']['nr_ticks'] - self._found_victim_tick
+
+                # here we check if the human agent has picked up the victim and send a message with the time this has taken to happen
                 if not self._updated_time_carry and self._max_wait_time != np.inf and time_to_arrive != -np.inf and self._print_time_waited:
                     self._updated_time_carry = True
                     self._send_message('Carrying victim together with human ' +
@@ -728,6 +731,7 @@ class BaselineAgent(ArtificialBrain):
                                                                 'obj_id': info['obj_id']}
 
                                 # Communicate which victim the agent found and ask the human whether to rescue the victim now or at a later stage
+
                                 if 'mild' in vic and self._answered == False and not self._waiting:
                                     self._send_message('Found ' + vic + ' in ' + self._door['room_name'] + '. Please decide whether to "Rescue together", "Rescue alone", or "Continue" searching. \n \n \
                                         Important features to consider are: \n safe - victims rescued: ' + str(
@@ -775,8 +779,8 @@ class BaselineAgent(ArtificialBrain):
                     combined_trust = (0.7 * trustBeliefs[self._human_name]['rescue_red']['willingness']
                                       + 0.3 * trustBeliefs[self._human_name]['rescue_red']['competence'])
                     trusting = self.probability_trust(combined_trust)
-                    #TODO: consider the time we wait somehow in here, but not quite sure
-                    if trusting:
+                    # implement a decision branching point
+                    if trusting:# if we trust, we will rescue together and communicate that
                         self._rescue = 'together'
                         self._answered = True
                         self._waiting = False
@@ -786,6 +790,7 @@ class BaselineAgent(ArtificialBrain):
                                 self._recent_vic) + ' together.', 'RescueBot')
                             self.robot_found = True
                             self._found_victim_tick = state['World']['nr_ticks']
+                            # calculate how long to wait for the human at location
                             willingness_to_rescue_trust = (
                                         0.70 * trustBeliefs[self._human_name]['rescue_red']['willingness']
                                         + 0.30 * trustBeliefs[self._human_name]['rescue_red']['competence'])
@@ -810,6 +815,7 @@ class BaselineAgent(ArtificialBrain):
                         print("I am here now cause I trust and should be in the case where robot found:")
                         self._phase = Phase.PLAN_PATH_TO_VICTIM
                     else:
+                        #if we do not trust, communicate that and continue
                         self._answered = True
                         self._waiting = False
                         self._send_message('I do not trust you enough to rely on you to save red victim right now,'
@@ -826,8 +832,9 @@ class BaselineAgent(ArtificialBrain):
                     combined_trust = (0.7 * trustBeliefs[self._human_name]['rescue_yellow']['willingness']
                                       + 0.3 * trustBeliefs[self._human_name]['rescue_yellow']['competence'])
                     trusting = self.probability_trust(combined_trust)
-                    print('here')
+                    # determine if we trust the human
                     if trusting:
+                        #if we trust, rescue together
                         self._rescue = 'together'
                         self._answered = True
                         self._waiting = False
@@ -848,7 +855,6 @@ class BaselineAgent(ArtificialBrain):
 
                         # Tell the human to carry the mildly injured victim together
 
-                        #TODO: update trust positive based on this message
                         if state[{'is_human_agent': True}]:
                             self._send_message('Lets carry ' + str(
                                 self._recent_vic) + ' together! Please wait until I moved on top of ' + str(
@@ -980,12 +986,15 @@ class BaselineAgent(ArtificialBrain):
 
                         objects.append(info)
                         # check if the robot found the victim, meaning we are waiting for the person to come
+                        # if we need to wait for the human, so not present at location and we are at location of vicitm
                         if not self._coming_from_carry and not self._coming_from_victim_log:
+                            # did we find this victim
                             if self.robot_found:
-                                print('robot found')
+                                #if human is not prsent
                                 if self._human_name not in info['name']:
-                                    print('Here?')
+                                    # if human did not come in time, calculate how long we have been waiting for
                                     if state['World']['nr_ticks'] - self._found_victim_tick > self._max_wait_time:
+                                        # move on if the human exceeded wait limit
                                         self._found_victim_tick = np.inf
                                         self._max_wait_time = np.inf
                                         # self._answered = True
@@ -999,8 +1008,7 @@ class BaselineAgent(ArtificialBrain):
                                         self._phase = Phase.FIND_NEXT_GOAL
                                         return None, {}
                                     else:
-                                        print('waiting')
-                                        print(state['World']['nr_ticks'] - self._found_victim_tick)
+                                        #wait while human comes
                                         self._waiting = True
                                         self._moving = False
                                         return None, {}
@@ -1018,7 +1026,6 @@ class BaselineAgent(ArtificialBrain):
                                     #  for loops and normal performance
 
                                     #we determine the trust to use and the message to send when human not present at location
-
                                     if 'mild' in info['obj_id']:
                                         combined_trust = (0.5 * trustBeliefs[self._human_name]['rescue_yellow']['willingness']
                                                           + 0.5 * trustBeliefs[self._human_name]['rescue_yellow']['competence'])
@@ -1031,6 +1038,7 @@ class BaselineAgent(ArtificialBrain):
                                         self._send_message('Human agent not present at location to save critical victim together', "RescueBot")
 
                                     if we_trust:
+                                        # we trust the hyman to come back
                                         self._waiting = True
                                         self._moving = False
                                         self._send_message("Waiting for human to come pick up victim together",
@@ -1038,6 +1046,7 @@ class BaselineAgent(ArtificialBrain):
                                         return None, {}
 
                                     else:
+                                        # we decide to save a mild victim ourselves or move on for a critical one
                                         if 'mild' in info['obj_id']:
                                             self._answered = True
                                             self._waiting = False
@@ -1125,6 +1134,10 @@ class BaselineAgent(ArtificialBrain):
 
 
     def probability_trust(self, trust_value):
+        """
+        trust-value - value we have calculated for trust between -1 and 1, based on which we decide whether to trust the human
+        @return True or False based on the random choice
+        """
         prob_trust = (trust_value + 1) / 2
         prob_trust = np.clip(prob_trust, 0.01, 1)
         # Generate a single random True/False
@@ -1335,19 +1348,25 @@ class BaselineAgent(ArtificialBrain):
           # if statements again possibly
           # if len(receivedMessages) == 0:
           #     return
+
+          # get the tick_nr when the method is called
           tick_nr = self._state['World']['nr_ticks']
           _distance_drop = 'far'
+
           if self._agent_loc in [1, 2, 5, 6, 8, 9, 11, 12]:
               _distance_drop = 'far'
           if self._agent_loc in [3, 4, 7, 10, 13, 14]:
               _distance_drop = 'close'
+          #determine and store the distance to the drop zone for the robot at every tick to use for updates
           self._tick_distance_goal[tick_nr] = _distance_drop
 
+          # keep a track of all received messages without duplicates with the respective tick it has occurred
           diffLen = len(receivedMessages) + self._last_length_received_messages - len(self._current_tick_received_messages)
           new_messages = receivedMessages[-diffLen:] if diffLen > 0 else []
           for message in new_messages:
               self._current_tick_received_messages.append((message, tick_nr))
 
+          # keep a track of all sent messages without duplicates with the respective tick it has occurred
           diffLen_send = len(self._send_messages) + self._last_length_send_messages - len(self._send_message_ticks)
           new_messages = self._send_messages[-diffLen_send:] if diffLen_send > 0 else []
           for message in new_messages:
@@ -1378,6 +1397,7 @@ class BaselineAgent(ArtificialBrain):
                       trustBeliefs[self._human_name]['rescue_yellow']['competence'] -= 0.05
                       trustBeliefs[self._human_name]['rescue_yellow']['willingness'] += 0.1
                   elif msg.startswith('Carrying'):
+                      #determine how to update trust based on when the human agent has picked up the victim if in time
                       match = re.findall(r'waiting (\d+) with max waiting time of (\d+)', msg)
                       waiting_time = 0
                       max_waiting_time = 0
@@ -1408,6 +1428,7 @@ class BaselineAgent(ArtificialBrain):
                               trustBeliefs[self._human_name]['rescue_red']['willingness'] -= 0.1
 
                   elif 'Human did not' in msg:
+                      #human not present after calling robot for help
                       if 'mild' in msg:
                           trustBeliefs[self._human_name]['rescue_yellow']['competence'] -= 0.2
                           trustBeliefs[self._human_name]['rescue_yellow']['willingness'] -= 0.2
@@ -1416,6 +1437,7 @@ class BaselineAgent(ArtificialBrain):
                           trustBeliefs[self._human_name]['rescue_red']['competence'] -= 0.2
 
                   elif msg.startswith('Lets carry') and 'Please wait until I moved on top of' in msg:
+                      #human was already there when robot asked for help
                       if 'mild' in msg:
                           trustBeliefs[self._human_name]['rescue_yellow']['competence'] += 0.25
                           trustBeliefs[self._human_name]['rescue_yellow']['willingness'] += 0.25
@@ -1423,6 +1445,7 @@ class BaselineAgent(ArtificialBrain):
                           trustBeliefs[self._human_name]['rescue_red']['willingness'] += 0.25
                           trustBeliefs[self._human_name]['rescue_red']['competence'] += 0.25
                   elif msg.startswith('Discovered'):
+                      #robot found a victim the human supposedly collected
                       trustBeliefs[self._human_name]['rescue_yellow']['competence'] -= 0.1
                       trustBeliefs[self._human_name]['rescue_yellow']['willingness'] -= 0.1
 
@@ -1453,7 +1476,7 @@ class BaselineAgent(ArtificialBrain):
 
               next_received_messages = self.find_next_received(send_tick)
               for response, resp_tick in next_received_messages:
-
+                    #check if human gives response and adequate response in time from a mild robot query
                   if 'Found mild' in send_message:
                       if not given_relevant_response_in_time_yellow:
                           # Extract "distance between us"
@@ -1478,7 +1501,7 @@ class BaselineAgent(ArtificialBrain):
                               if resp_tick - send_tick > relevant_response_time_threshold_yellow:
                                   trustBeliefs[self._human_name]['rescue_yellow']['willingness'] -= 0.1
                                   trustBeliefs[self._human_name]['rescue_yellow']['competence'] -= 0.1
-
+                    #check if human gives response and adequate response in time from a criticial robot query
                   elif 'Found critical' in send_message:
                       if not given_relevant_response_in_time_red:
 
@@ -1513,6 +1536,7 @@ class BaselineAgent(ArtificialBrain):
 
           for rec_message, rec_tick in [t for t in self._current_tick_received_messages if 'Found:' in t[0]]:
               next_received_messages = self.find_next_received(rec_tick)
+              #check for quality response of the human when he himself finds a mild victim
               if 'mild' in rec_message:
                   regex_extractor = re.search(r"Found: (.*?) in (\d+)", rec_message)
                   found_victim = regex_extractor.group(1)
@@ -1567,9 +1591,31 @@ class BaselineAgent(ArtificialBrain):
         return trustBeliefs
 
     def find_next_received(self, tick):
+        """
+
+        Parameters
+        ----------
+        tick - tick to search after
+
+        Returns
+        -------
+        the list of received messages after this tick
+        """
         return [t for t in self._current_tick_received_messages if t[1] > tick]
 
     def check_if_collected_victim_found(self, send_message, claimed_saved, trustBeliefs):
+        """
+
+        Parameters
+        ----------
+        send_message - the message to analyze
+        claimed_saved - supposed claimed saved vicitms
+        trustBeliefs - dictionary
+
+        Returns
+        -------
+        nothing, but updates the trust belief if found a collected victim
+        """
         match = re.search(r'Found\s+(\w+)\s+(\w+)\s+(\w+)', send_message)
         victim = None
         if match:
@@ -1579,14 +1625,50 @@ class BaselineAgent(ArtificialBrain):
                 trustBeliefs[self._human_name]['rescue_yellow']['willingness'] -= 0.3
 
     def match_collect(self,send_message, claimed_saved, trustBeliefs):
+        """
+        matching human message for collecting
+        Parameters
+        ----------
+        send_message
+        claimed_saved
+        trustBeliefs
+
+        Returns
+        -------
+
+        """
         match = re.search(r'Collect:\s+(\w+)\s+(\w+)\s+(\w+)', send_message)
         self.update_collected_victims(claimed_saved, trustBeliefs, match)
 
     def match_picking_up(self,send_message, claimed_saved, trustBeliefs):
+        """
+        matching robot message for picking up
+        Parameters
+        ----------
+        send_message
+        claimed_saved
+        trustBeliefs
+
+        Returns
+        -------
+
+        """
         match = re.search(r'Picking up:\s+(\w+)\s+(\w+)\s+(\w+)', send_message)
         self.update_collected_victims(claimed_saved, trustBeliefs, match)
 
     def update_collected_victims(self, claimed_saved, trustBeliefs, match):
+        """
+        monitoring claimed_saved and updating trust beliefs if same victim occurs twice
+        Parameters
+        ----------
+        claimed_saved
+        trustBeliefs
+        match
+
+        Returns
+        -------
+
+        """
         #I think this needs to be updated to facilitate for the victims that the robot picks up
         #I do not think this is happening right now, also new messages for picking up victims
         if not match:
