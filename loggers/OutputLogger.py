@@ -3,7 +3,7 @@ import sys
 import csv
 import glob
 import pathlib
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 
 def output_logger(fld):
     recent_dir = max(glob.glob(os.path.join(fld, '*/')), key=os.path.getmtime)
@@ -115,42 +115,42 @@ def evaluation_plots(recent_dir):
                 trust_beliefs[header[5]].append(float(row[5]))
                 trust_beliefs[header[6]].append(float(row[6]))
 
-    plt.figure(figsize=(10, 15))
-
-    # Create a plot for the search task
-    plt.subplot(3, 1, 1)  # (rows, columns, index) → First subplot
-    plt.plot(ticks, trust_beliefs[header[1]], marker='o', linestyle='-', label=header[1])
-    plt.plot(ticks, trust_beliefs[header[2]], marker='o', linestyle='-', label=header[2])
-    plt.xlabel("Ticks")
-    plt.ylabel("Trust")
-    plt.title("Search Trust Values Throughout the Game")
-    plt.legend()
-    plt.grid(True)
-
-    # Second plot: header[3] and header[4]
-    plt.subplot(3, 1, 2)  # Second subplot below the first one
-    plt.plot(ticks, trust_beliefs[header[3]], marker='o', linestyle='-', label=header[3])
-    plt.plot(ticks, trust_beliefs[header[4]], marker='o', linestyle='-', label=header[4])
-    plt.xlabel("Ticks")
-    plt.ylabel("Trust")
-    plt.title("Rescue Trust Values for Critically Injured Victims Throughout the Game")
-    plt.legend()
-    plt.grid(True)
-
-    # Second plot: header[3] and header[4]
-    plt.subplot(3, 1, 3)  # Second subplot below the first one
-    plt.plot(ticks, trust_beliefs[header[5]], marker='o', linestyle='-', label=header[5])
-    plt.plot(ticks, trust_beliefs[header[6]], marker='o', linestyle='-', label=header[6])
-    plt.xlabel("Ticks")
-    plt.ylabel("Trust")
-    plt.title("Rescue Trust Values for Mildly Injured Victims Throughout the Game")
-    plt.legend()
-    plt.grid(True)
-
-    # Save and show
-    plt.tight_layout()  # Adjust layout to prevent overlap
-    plt.savefig(os.path.join(recent_dir, 'world_1/evaluation_plot.png'))
-    plt.show()
+    # plt.figure(figsize=(10, 15))
+    #
+    # # Create a plot for the search task
+    # plt.subplot(3, 1, 1)  # (rows, columns, index) → First subplot
+    # plt.plot(ticks, trust_beliefs[header[1]], marker='o', linestyle='-', label=header[1])
+    # plt.plot(ticks, trust_beliefs[header[2]], marker='o', linestyle='-', label=header[2])
+    # plt.xlabel("Ticks")
+    # plt.ylabel("Trust")
+    # plt.title("Search Trust Values Throughout the Game")
+    # plt.legend()
+    # plt.grid(True)
+    #
+    # # Second plot: header[3] and header[4]
+    # plt.subplot(3, 1, 2)  # Second subplot below the first one
+    # plt.plot(ticks, trust_beliefs[header[3]], marker='o', linestyle='-', label=header[3])
+    # plt.plot(ticks, trust_beliefs[header[4]], marker='o', linestyle='-', label=header[4])
+    # plt.xlabel("Ticks")
+    # plt.ylabel("Trust")
+    # plt.title("Rescue Trust Values for Critically Injured Victims Throughout the Game")
+    # plt.legend()
+    # plt.grid(True)
+    #
+    # # Second plot: header[3] and header[4]
+    # plt.subplot(3, 1, 3)  # Second subplot below the first one
+    # plt.plot(ticks, trust_beliefs[header[5]], marker='o', linestyle='-', label=header[5])
+    # plt.plot(ticks, trust_beliefs[header[6]], marker='o', linestyle='-', label=header[6])
+    # plt.xlabel("Ticks")
+    # plt.ylabel("Trust")
+    # plt.title("Rescue Trust Values for Mildly Injured Victims Throughout the Game")
+    # plt.legend()
+    # plt.grid(True)
+    #
+    # # Save and show
+    # plt.tight_layout()  # Adjust layout to prevent overlap
+    # plt.savefig(os.path.join(recent_dir, 'world_1/evaluation_plot.png'))
+    # plt.show()
 
 
 def completion_pct_plots(recent_dir):
@@ -170,19 +170,19 @@ def completion_pct_plots(recent_dir):
                 ticks.append(i)
                 completion_pct.append(float(row[1]))
 
-    plt.figure(figsize=(10, 5))
-
-    plt.plot(ticks, completion_pct, marker='o', linestyle='-', label=header[1])
-    plt.xlabel("Ticks")
-    plt.ylabel("Completion Percentage")
-    plt.title("Completion Percentage Throughout the Game")
-    plt.legend()
-    plt.grid(True)
-
-    # Save and show
-    plt.tight_layout()  # Adjust layout to prevent overlap
-    plt.savefig(os.path.join(recent_dir, 'world_1/completion_pct_plot.png'))
-    plt.show()
+    # plt.figure(figsize=(10, 5))
+    #
+    # plt.plot(ticks, completion_pct, marker='o', linestyle='-', label=header[1])
+    # plt.xlabel("Ticks")
+    # plt.ylabel("Completion Percentage")
+    # plt.title("Completion Percentage Throughout the Game")
+    # plt.legend()
+    # plt.grid(True)
+    #
+    # # Save and show
+    # plt.tight_layout()  # Adjust layout to prevent overlap
+    # plt.savefig(os.path.join(recent_dir, 'world_1/completion_pct_plot.png'))
+    # plt.show()
 
 
 def trust_evolution_rounds_plots():
@@ -209,21 +209,21 @@ def trust_evolution_rounds_plots():
     rescue_yellow_competence = [float(row[2]) for row in beliefs if row[1] == 'rescue_yellow']
     rescue_yellow_willingness = [float(row[3]) for row in beliefs if row[1] == 'rescue_yellow']
 
-    plt.figure(figsize=(10, 5))
-    plt.plot(search_competence, marker='o', linestyle='-', label='Search Competence')
-    plt.plot(search_willingness, marker='o', linestyle='-', label='Search Willingness')
-
-    plt.plot(rescue_red_willingness, marker='o', linestyle='-', label='Rescue Red Willingness')
-    plt.plot(rescue_red_competence, marker='o', linestyle='-', label='Rescue Red Competence')
-    plt.plot(rescue_yellow_willingness, marker='o', linestyle='-', label='Rescue Yellow Willingness')
-    plt.plot(rescue_yellow_competence, marker='o', linestyle='-', label='Rescue Yellow Competence')
-
-    plt.xlabel("Rounds")
-    plt.ylabel("Trust")
-    plt.title("Trust Evolution Throughout the Rounds")
-    plt.legend()
-    plt.grid(True)
-
-    plt.tight_layout()  # Adjust layout to prevent overlap
-    plt.savefig('beliefs/trust_evolution_rounds.png')
-    plt.show()
+    # plt.figure(figsize=(10, 5))
+    # plt.plot(search_competence, marker='o', linestyle='-', label='Search Competence')
+    # plt.plot(search_willingness, marker='o', linestyle='-', label='Search Willingness')
+    #
+    # plt.plot(rescue_red_willingness, marker='o', linestyle='-', label='Rescue Red Willingness')
+    # plt.plot(rescue_red_competence, marker='o', linestyle='-', label='Rescue Red Competence')
+    # plt.plot(rescue_yellow_willingness, marker='o', linestyle='-', label='Rescue Yellow Willingness')
+    # plt.plot(rescue_yellow_competence, marker='o', linestyle='-', label='Rescue Yellow Competence')
+    #
+    # plt.xlabel("Rounds")
+    # plt.ylabel("Trust")
+    # plt.title("Trust Evolution Throughout the Rounds")
+    # plt.legend()
+    # plt.grid(True)
+    #
+    # plt.tight_layout()  # Adjust layout to prevent overlap
+    # plt.savefig('beliefs/trust_evolution_rounds.png')
+    # plt.show()
