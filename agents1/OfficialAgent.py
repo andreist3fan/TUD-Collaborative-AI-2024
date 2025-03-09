@@ -308,7 +308,7 @@ class BaselineAgent(ArtificialBrain):
                         # Plan path to area because the exact victim location is not known, only the area (i.e., human found this  victim)
                         if 'location' not in self._found_victim_logs[vic].keys():
                             self.robot_found = False
-                            self._coming_from_victim_log = False
+                            self._coming_from_victim_log = True
                             self._coming_from_carry = False
                             self._phase = Phase.PLAN_PATH_TO_ROOM
                             return Idle.__name__, {'duration_in_ticks': 25}
@@ -685,6 +685,12 @@ class BaselineAgent(ArtificialBrain):
                     for info in state.values():
                         if 'class_inheritance' in info and 'CollectableBlock' in info['class_inheritance']:
                             vic = str(info['img_name'][8:-4])
+
+                            if vic in self._supposed_collected_to_room.keys():
+                                self._send_message(
+                                    'Discovered a victim that was supposedly collected from the user, '
+                                    'but not confirmed until now. Human agent lied about collecting it', 'RescueBot')
+
                             # Remember which victim the agent found in this area
                             if vic not in self._room_vics:
                                 self._room_vics.append(vic)
@@ -718,6 +724,7 @@ class BaselineAgent(ArtificialBrain):
                                 self._found_victim_logs[vic] = {'location': info['location'],
                                                                 'room': self._door['room_name'],
                                                                 'obj_id': info['obj_id']}
+
                                 # Communicate which victim the agent found and ask the human whether to rescue the victim now or at a later stage
                                 if 'mild' in vic and self._answered == False and not self._waiting:
                                     self._send_message('Found ' + vic + ' in ' + self._door['room_name'] + '. Please decide whether to "Rescue together", "Rescue alone", or "Continue" searching. \n \n \
@@ -778,8 +785,8 @@ class BaselineAgent(ArtificialBrain):
                             self.robot_found = True
                             self._found_victim_tick = state['World']['nr_ticks']
                             willingness_to_rescue_trust = (
-                                        0.75 * trustBeliefs[self._human_name]['rescue_red']['willingness']
-                                        + 0.25 * trustBeliefs[self._human_name]['rescue_red']['competence'])
+                                        0.70 * trustBeliefs[self._human_name]['rescue_red']['willingness']
+                                        + 0.30 * trustBeliefs[self._human_name]['rescue_red']['competence'])
                             self._max_wait_time = self.compute_wait_time_robot_calls_human(willingness_to_rescue_trust)
                             self._send_message('I will wait for you to pick up critical victim for ' + str(self._max_wait_time/10) + ' seconds',
                                                'RescueBot')
@@ -828,8 +835,8 @@ class BaselineAgent(ArtificialBrain):
                                 self._recent_vic) + ' together.', 'RescueBot')
                             self._found_victim_tick = state['World']['nr_ticks']
                             willingness_to_rescue_trust = (
-                                    0.75 * trustBeliefs[self._human_name]['rescue_yellow']['willingness']
-                                    + 0.25 * trustBeliefs[self._human_name]['rescue_yellow']['competence'])
+                                    0.7 * trustBeliefs[self._human_name]['rescue_yellow']['willingness']
+                                    + 0.3 * trustBeliefs[self._human_name]['rescue_yellow']['competence'])
                             self._max_wait_time = self.compute_wait_time_robot_calls_human(willingness_to_rescue_trust)
                             self._send_message('I will wait for you to pick up the victim for ' + str(
                                 self._max_wait_time / 10) + ' seconds',
@@ -1059,7 +1066,6 @@ class BaselineAgent(ArtificialBrain):
 
                 if self._take_victim_repeat:
                     self._rescue = 'alone'
-                self._take_victim_repeat = False
 
 
 
@@ -1409,6 +1415,10 @@ class BaselineAgent(ArtificialBrain):
                       else:
                           trustBeliefs[self._human_name]['rescue_red']['willingness'] += 0.25
                           trustBeliefs[self._human_name]['rescue_red']['competence'] += 0.25
+                  elif msg.startswith('Discovered'):
+                      trustBeliefs[self._human_name]['rescue_yellow']['competence'] -= 0.1
+                      trustBeliefs[self._human_name]['rescue_yellow']['willingness'] -= 0.1
+
 
               if send_index == len(self._send_message_ticks):
                   cur_message = self._current_tick_received_messages[received_index][0]
