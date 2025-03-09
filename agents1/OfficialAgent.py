@@ -1603,16 +1603,9 @@ class BaselineAgent(ArtificialBrain):
 
 
     def trustBeliefSearch(self, receivedMessages, trustBeliefs):
-        # Update the trust value based on for example the received messages
-        # Since `receivedMessages` is a list of all messages,
-        # some messages will be counted many times, so we reset the trust values to defaults here.
-
-        # trustBeliefs[self._human_name]['search']['competence'] = self._default_trust_value
-        # trustBeliefs[self._human_name]['search']['willingness'] = self._default_trust_value
-        #print(f"Current belief: {trustBeliefs[self._human_name]['search']['competence']}, {trustBeliefs[self._human_name]['search']['willingness']}")
-
         area_rec_messages = {}
         area_sent_messages = {}
+        # group messages by area
         for room in range(1, 15):
             area_rec_messages[room] = []
             area_sent_messages[room] = []
@@ -1629,7 +1622,7 @@ class BaselineAgent(ArtificialBrain):
                 if victim in self._found_victims and 'area ' + str(room_number) == self._found_victim_logs[victim][
                     'room']:
                     # the human communicated a possible room location of the victim
-                    # TODO use some sort of confidence level (multiplying factor) such that when the human communicates correctly multiple times, the confidence increases
+                    # future improvement:  use some sort of confidence level (multiplying factor) such that when the human communicates correctly multiple times, the confidence increases
                     # e.g. trust_factor and distrust_factor between 0 and 1
                     trustBeliefs[self._human_name]['search']['willingness'] += 0.10
 
@@ -1648,7 +1641,7 @@ class BaselineAgent(ArtificialBrain):
                 regex_extractor = re.search(r"Remove: at (\d+)", message)
                 room_number = int(regex_extractor.group(1))
                 area_rec_messages[room_number].append(message)
-        for message in self._send_messages:
+        for message in self._send_messages: # look through the messages that the robot sent
             if message.startswith('Moving to'):  # moving to area
                 regex_extractor = re.search(r"Moving to area (\d+)", message)
                 room_number = int(regex_extractor.group(1))
@@ -1744,10 +1737,3 @@ class BaselineAgent(ArtificialBrain):
             else:
                 locs.append((x[i], max(y)))
         return locs
-
-    # def random_pick(self, competence):
-    #     random_number = random.random()
-    #     if random_number < (competence+1)/2:
-    #         return True
-    #     else:
-    #         return False
