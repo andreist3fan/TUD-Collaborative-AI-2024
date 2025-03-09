@@ -1302,7 +1302,7 @@ class BaselineAgent(ArtificialBrain):
             # Initialize default trust values
             if self._human_name not in trustBeliefs:
                 if( (not self.type == 'random') or (self.type =='random' and self.random_trust_persistence is None)):
-                    print("RESET VALUES")
+                    #print("RESET VALUES")
                     trustBeliefs[self._human_name] = {}
 
                     s_competence = self._default_trust_value()
